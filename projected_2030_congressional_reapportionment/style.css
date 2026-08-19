@@ -31,9 +31,10 @@
   --red: #ed1c24;
   --blue: #007194;
   --orange: #f67613;
-  --div-neg: var(--orange);
+  --green: #12a657;
+  --div-neg: var(--yellow);
   --div-mid: #dbdada;
-  --div-pos: var(--blue);
+  --div-pos: var(--green);
   --div-none: #cfcdc7;
 }
 
@@ -85,6 +86,9 @@ h3 {
   font-size: 10px;
   width: 500px;
   max-width: 100%;
+}
+.footnote strong {
+  font-family: "BentonStrong";
 }
 
 .toggle-btn {
@@ -222,11 +226,6 @@ g.state-label text {
   dominant-baseline: central;
   pointer-events: none;
   fill: black;
-  paint-order: stroke fill;
-  stroke: white;
-  stroke-width: 1px;
-  stroke-linejoin: round;
-  stroke-opacity: 0.6;
 }
 g.state-label text.abbr,
 g.state-label text.carto-abbr {

@@ -28,7 +28,7 @@
       <span class="legend-note" id="noDataNote"><span class="swatch"></span> DC — no voting House seat</span>
     </div>
     <div class="map-wrap">
-      <svg id="chart" viewBox="0 0 1120 750" role="img" aria-label="Map of US states morphing between true geography and an equal-area tile grid"></svg>
+      <svg id="chart" viewBox="0 0 1120 850" role="img" aria-label="Map of US states morphing between true geography and an equal-area tile grid"></svg>
       <div id="status" class="status">Loading state boundaries…</div>
     </div>
     <div class="controls">
@@ -41,6 +41,7 @@
       </div>
     </div>
   </div>
+  <p class="footnote"><strong>Source:</strong> Brennan Center projections based on the Census Bureau's Vintage 2025 estimates of population change April 1, 2020 and July 1, 2025.</p>
 </div>
 
 <div id="tooltip" class="tooltip"></div>
@@ -51,7 +52,7 @@
 <script>
 (async function () {
   const SHOW_NO_DATA_NOTE = false;
-  const WIDTH = 960, HEIGHT = 750;
+  const WIDTH = 960, HEIGHT = 850, CANVAS_W = 1120;
   const svg = d3.select("#chart");
   const statusEl = document.getElementById("status");
   const tooltip = d3.select("#tooltip");
@@ -115,9 +116,9 @@
   const fmtDelta = v => v > 0 ? `+${v}` : v < 0 ? `${v}` : "no change";
 
   const COLS = 11, ROWS = 8;
-  const CELL = 84, GAP = 3;
+  const CELL = 96, GAP = 3;
   const GRID_W = COLS * CELL, GRID_H = ROWS * CELL;
-  const GRID_X0 = (WIDTH - GRID_W) / 2, GRID_Y0 = (HEIGHT - GRID_H) / 2;
+  const GRID_X0 = (CANVAS_W - GRID_W) / 2, GRID_Y0 = (HEIGHT - GRID_H) / 2;
 
   function squarePath(col, row) {
     const x = GRID_X0 + col * CELL + GAP / 2;
@@ -258,7 +259,7 @@
   normalLabels.filter(d => d.hasData)
     .append("text")
     .attr("class", "carto-abbr")
-    .attr("dy", -16)
+    .attr("dy", -13)
     .attr("opacity", 0)
     .text(d => d.abbr);
 
@@ -287,13 +288,13 @@
   smallInteriorLabels.filter(d => d.hasData)
     .append("text")
     .attr("class", "carto-abbr")
-    .attr("dy", -16)
+    .attr("dy", -13)
     .text(d => d.abbr);
 
   smallInteriorLabels.filter(d => d.hasData)
     .append("text")
     .attr("class", "value")
-    .attr("dy", 16)
+    .attr("dy", 13)
     .text(d => d.value);
 
   smallInteriorLabels.filter(d => !d.hasData)
@@ -301,6 +302,9 @@
     .attr("class", "abbr")
     .attr("dy", 0)
     .text(d => d.abbr);
+
+  const smallCartoAbbr = gSmallLabels.selectAll("text.carto-abbr");
+  const smallValueTexts = gSmallLabels.selectAll("text.value");
 
   const callouts = gCallouts.selectAll("g.callout")
     .data(smallStates, d => d.id)
@@ -314,9 +318,16 @@
     .attr("dy", 0)
     .text(d => d.hasData ? `${d.value}` : "no voting seat");
 
+  const BASE_DY = 13;
   const labelOpacity = d3.scaleLinear().domain([0.35, 0.75]).range([0, 1]).clamp(true);
-  const valueDy = d3.scaleLinear().domain([0.35, 0.75]).range([0, 16]).clamp(true);
+  const valueDy = d3.scaleLinear().domain([0.35, 0.75]).range([0, 1]).clamp(true);
   const calloutOpacity = d3.scaleLinear().domain([0.15, 0.4]).range([1, 0]).clamp(true);
+  let dyMagnitude = BASE_DY;
+
+  svg.selectAll("g.state-label text")
+    .style("text-shadow", d => d.hasData && Math.abs(d.delta) >= 3
+      ? "0 0 3px rgba(255,255,255,0.7)"
+      : "0 0 1.5px rgba(255,255,255,0.5)");
 
   const toggleBtn = document.getElementById("toggle");
   const labelGeo = document.getElementById("labelGeo");
@@ -331,7 +342,7 @@
       return `translate(${x},${y})`;
     });
     normalCartoAbbr.attr("opacity", labelOpacity(t));
-    normalValueTexts.attr("dy", valueDy(t));
+    normalValueTexts.attr("dy", valueDy(t) * dyMagnitude);
     smallInteriorLabels.attr("opacity", labelOpacity(t));
     callouts.attr("opacity", calloutOpacity(t));
     calloutLines.attr("opacity", calloutOpacity(t));
@@ -378,6 +389,8 @@
   document.getElementById("noDataNote").style.display = SHOW_NO_DATA_NOTE ? "" : "none";
 
   const MIN_LABEL_PX = 12;
+  const MIN_DY_PX = 8;
+  const MAX_DY = 18;
   const BASE_VALUE_SIZE = 14, BASE_ABBR_SIZE = 10;
   const valueTexts = svg.selectAll("text.value, text.callout-value");
   const abbrTexts = svg.selectAll("text.abbr, text.carto-abbr");
@@ -391,6 +404,12 @@
     const abbrSize = Math.max(BASE_ABBR_SIZE, minViewBoxSize);
     valueTexts.style("font-size", valueSize + "px");
     abbrTexts.style("font-size", abbrSize + "px");
+
+    dyMagnitude = Math.min(MAX_DY, Math.max(BASE_DY, MIN_DY_PX / scale));
+    normalCartoAbbr.attr("dy", -dyMagnitude);
+    smallCartoAbbr.attr("dy", -dyMagnitude);
+    smallValueTexts.attr("dy", dyMagnitude);
+    normalValueTexts.attr("dy", valueDy(currentT) * dyMagnitude);
   }
 
   applyMinLabelSize();
