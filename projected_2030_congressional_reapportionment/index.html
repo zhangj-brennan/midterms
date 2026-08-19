@@ -213,7 +213,7 @@
   function tooltipHtml(d) {
     return `<strong>${d.name}</strong><br>` +
       (d.hasData
-        ? `<span class="sub">${fmtDelta(d.delta)} seats · ${d.value} total</span>`
+        ? `<span class="sub">${fmtDelta(d.delta)} ${seatWord(d.delta)} · ${d.value} total</span>`
         : `<span class="sub">No voting House seat</span>`);
   }
 
