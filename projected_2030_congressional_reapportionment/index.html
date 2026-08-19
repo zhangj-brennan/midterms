@@ -114,6 +114,7 @@
     .domain([minDelta, 0, maxDelta]);
 
   const fmtDelta = v => v > 0 ? `+${v}` : v < 0 ? `${v}` : "no change";
+  const seatWord = v => Math.abs(v) === 1 ? "seat" : "seats";
 
   const COLS = 11, ROWS = 8;
   const CELL = 96, GAP = 3;
@@ -209,6 +210,13 @@
   const gSmallLabels = svg.append("g");
   const gCallouts = svg.append("g");
 
+  function tooltipHtml(d) {
+    return `<strong>${d.name}</strong><br>` +
+      (d.hasData
+        ? `<span class="sub">${fmtDelta(d.delta)} seats · ${d.value} total</span>`
+        : `<span class="sub">No voting House seat</span>`);
+  }
+
   const paths = gStates.selectAll("path.state")
     .data(states, d => d.id)
     .join("path")
@@ -224,17 +232,30 @@
         .style("left", event.clientX + "px")
         .style("top", event.clientY + "px")
         .style("opacity", 1)
-        .html(
-          `<strong>${d.name}</strong><br>` +
-          (d.hasData
-            ? `<span class="sub">${fmtDelta(d.delta)} seats · ${d.value} total</span>`
-            : `<span class="sub">No voting House seat</span>`)
-        );
+        .html(tooltipHtml(d));
     })
     .on("mouseleave", function () {
       d3.select(this).classed("is-hover", false);
       tooltip.style("opacity", 0);
+    })
+    .on("touchstart", function (event, d) {
+      event.preventDefault();
+      paths.classed("is-hover", false);
+      d3.select(this).classed("is-hover", true).raise();
+      const touch = event.touches[0];
+      tooltip
+        .style("left", touch.clientX + "px")
+        .style("top", touch.clientY + "px")
+        .style("opacity", 1)
+        .html(tooltipHtml(d));
     });
+
+  document.addEventListener("touchstart", event => {
+    if (!event.target.closest("path.state")) {
+      paths.classed("is-hover", false);
+      tooltip.style("opacity", 0);
+    }
+  });
 
   svg.on("mouseleave", () => {
     paths.classed("is-hover", false);
