@@ -31,10 +31,11 @@
   --red: #ed1c24;
   --blue: #007194;
   --orange: #f67613;
+  --purple:#711471;
   --green: #12a657;
   --div-neg: var(--yellow);
   --div-mid: #dbdada;
-  --div-pos: var(--green);
+  --div-pos: var(--purple);
   --div-none: #cfcdc7;
 }
 
