@@ -28,7 +28,7 @@
       <span class="legend-note" id="noDataNote"><span class="swatch"></span> DC — no voting House seat</span>
     </div>
     <div class="map-wrap">
-      <svg id="chart" viewBox="0 0 1120 850" role="img" aria-label="Map of US states morphing between true geography and an equal-area tile grid"></svg>
+      <svg id="chart" viewBox="0 0 1100 770" role="img" aria-label="Map of US states morphing between true geography and an equal-area tile grid"></svg>
       <div id="status" class="status">Loading state boundaries…</div>
     </div>
     <div class="controls">
@@ -52,7 +52,7 @@
 <script>
 (async function () {
   const SHOW_NO_DATA_NOTE = false;
-  const WIDTH = 960, HEIGHT = 850, CANVAS_W = 1120;
+  const WIDTH = 970, HEIGHT = 770, CANVAS_W = 1100;
   const svg = d3.select("#chart");
   const statusEl = document.getElementById("status");
   const tooltip = d3.select("#tooltip");
@@ -78,7 +78,7 @@
   };
 
   const CALLOUT_STATES = ["NJ", "RI", "DE", "MD"];
-  const CALLOUT_X = 1030;
+  const CALLOUT_X = 1010;
   const CALLOUT_Y_OFFSET = { MD: 61, DE: 18 };
   const CALLOUT_SHIFT = {};
   const CALLOUT_RUN = 4;
@@ -117,7 +117,7 @@
   const seatWord = v => Math.abs(v) === 1 ? "seat" : "seats";
 
   const COLS = 11, ROWS = 8;
-  const CELL = 96, GAP = 3;
+  const CELL = 80, GAP = 3;
   const GRID_W = COLS * CELL, GRID_H = ROWS * CELL;
   const GRID_X0 = (CANVAS_W - GRID_W) / 2, GRID_Y0 = (HEIGHT - GRID_H) / 2;
 
