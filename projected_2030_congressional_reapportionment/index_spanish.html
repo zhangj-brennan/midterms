@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redistribución prevista de los escaños del Congreso para 2030</title>
+<!--
+  Subtitle: Toggle each state between its true geographic shape and an
+  equal-area tile in a 51-cell grid, so no state's visual weight depends
+  on its land area.
+
+  Sources: State boundaries — US Census Bureau, via us-atlas (states-10m),
+  https://github.com/topojson/us-atlas. Shape morphing — Flubber,
+  https://github.com/veltman/flubber.
+-->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="container">
+  <div id="title">
+    <h1>Redistribución prevista de los escaños del Congreso para 2030</h1>
+  </div>
+
+  <div class="panel">
+    <div class="legend">
+      <h3>Cambio en el número de escaños</h3>
+      <div class="legend-buckets" id="legendBuckets"></div>
+      <span class="legend-note" id="noDataNote"><span class="swatch"></span> DC — no voting House seat</span>
+    </div>
+    <div class="map-wrap">
+      <svg id="chart" viewBox="0 30 1100 710" role="img" aria-label="Map of US states morphing between true geography and an equal-area tile grid"></svg>
+      <div id="status" class="status">Loading state boundaries…</div>
+    </div>
+    <div class="controls">
+      <div class="view-toggle">
+        <span class="toggle-label active" id="labelGeo">GEOGRÁFICO</span>
+        <button class="switch" id="toggle" role="switch" aria-checked="false" aria-label="Toggle between geographic and cartogram view">
+          <span class="switch-knob"></span>
+        </button>
+        <span class="toggle-label" id="labelCarto">CARTOGRÁFICO</span>
+      </div>
+    </div>
+  </div>
+  <p class="footnote"><strong>Fuente:</strong> Proyecciones del Brennan Center basadas en las estimaciones de cambios de población entre el 1.º de abril de 2020 y el 1.º de julio de 2025 del informe Vintage 2025 de la Oficina del Censo.</p>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flubber@0.4.2/build/flubber.min.js"></script>
+<script>
+(async function () {
+  const SHOW_NO_DATA_NOTE = false;
+  const WIDTH = 970, HEIGHT = 770, CANVAS_W = 1100;
+  const svg = d3.select("#chart");
+  const statusEl = document.getElementById("status");
+  const tooltip = d3.select("#tooltip");
+
+  const FIPS_TO_ABBR = {
+    "01":"AL","02":"AK","04":"AZ","05":"AR","06":"CA","08":"CO","09":"CT","10":"DE","11":"DC",
+    "12":"FL","13":"GA","15":"HI","16":"ID","17":"IL","18":"IN","19":"IA","20":"KS","21":"KY",
+    "22":"LA","23":"ME","24":"MD","25":"MA","26":"MI","27":"MN","28":"MS","29":"MO","30":"MT",
+    "31":"NE","32":"NV","33":"NH","34":"NJ","35":"NM","36":"NY","37":"NC","38":"ND","39":"OH",
+    "40":"OK","41":"OR","42":"PA","44":"RI","45":"SC","46":"SD","47":"TN","48":"TX","49":"UT",
+    "50":"VT","51":"VA","53":"WA","54":"WV","55":"WI","56":"WY"
+  };
+
+  const GRID = {
+    AK:[0,0], ME:[10,0],
+    NH:[10,1], VT:[9,1],
+    WA:[0,2], ID:[1,2], MT:[2,2], ND:[3,2], MN:[4,2], WI:[5,2], MI:[6,2], NY:[7,2], MA:[9,2], RI:[10,2],
+    OR:[0,3], NV:[1,3], WY:[2,3], SD:[3,3], IA:[4,3], IL:[5,3], IN:[6,3], OH:[7,3], PA:[8,3], NJ:[9,3], CT:[10,3],
+    CA:[0,4], UT:[1,4], CO:[2,4], NE:[3,4], MO:[4,4], KY:[5,4], WV:[6,4], VA:[7,4], MD:[8,4], DE:[9,4],
+    AZ:[1,5], NM:[2,5], KS:[3,5], AR:[4,5], TN:[5,5], NC:[6,5], SC:[7,5], DC:[8,5],
+    OK:[3,6], LA:[4,6], MS:[5,6], AL:[6,6], GA:[7,6],
+    HI:[0,7], TX:[3,7], FL:[8,7]
+  };
+
+  const CALLOUT_STATES = ["NJ", "RI", "DE", "MD"];
+  const CALLOUT_X = 1010;
+  const CALLOUT_Y_OFFSET = { MD: 61, DE: 18 };
+  const CALLOUT_SHIFT = {};
+  const CALLOUT_RUN = 4;
+  const CALLOUT_GAP = 5;
+
+  const DATA = [
+    ["Alabama",0,7,"AL"],["Alaska",0,1,"AK"],["Arizona",1,10,"AZ"],["Arkansas",0,4,"AR"],
+    ["California",-4,48,"CA"],["Colorado",0,8,"CO"],["Connecticut",0,5,"CT"],["Delaware",0,1,"DE"],
+    ["Florida",3,31,"FL"],["Georgia",1,15,"GA"],["Hawái",0,2,"HI"],["Idaho",1,3,"ID"],
+    ["Illinois",-1,16,"IL"],["Indiana",0,9,"IN"],["Iowa",0,4,"IA"],["Kansas",0,4,"KS"],
+    ["Kentucky",0,6,"KY"],["Luisiana",0,6,"LA"],["Maine",0,2,"ME"],["Maryland",0,8,"MD"],
+    ["Massachusetts",0,9,"MA"],["Michigan",0,13,"MI"],["Minnesota",-1,7,"MN"],["Mississippi",0,4,"MS"],
+    ["Missouri",0,8,"MO"],["Montana",0,2,"MT"],["Nebraska",0,3,"NE"],["Nevada",0,4,"NV"],
+    ["New Hampshire",0,2,"NH"],["Nueva Jersey",0,12,"NJ"],["Nuevo México",0,3,"NM"],["Nueva York",-2,24,"NY"],
+    ["Carolina del Norte",1,15,"NC"],["Dakota del Norte",0,1,"ND"],["Ohio",0,15,"OH"],["Oklahoma",0,5,"OK"],
+    ["Oregón",-1,5,"OR"],["Pensilvania",-1,16,"PA"],["Rhode Island",-1,1,"RI"],["Carolina del Sur",0,7,"SC"],
+    ["Dakota del Sur",0,1,"SD"],["Tennessee",0,9,"TN"],["Texas",4,42,"TX"],["Utah",1,5,"UT"],
+    ["Vermont",0,1,"VT"],["Virginia",0,11,"VA"],["Washington",0,10,"WA"],["West Virginia",0,2,"WV"],
+    ["Wisconsin",-1,7,"WI"],["Wyoming",0,1,"WY"]
+  ].reduce((acc, [name, delta, value, abbr]) => {
+    acc[abbr] = { name, delta, value, abbr };
+    return acc;
+  }, {});
+
+  const deltas = Object.values(DATA).map(d => d.delta);
+  const minDelta = Math.min(...deltas), maxDelta = Math.max(...deltas);
+
+  const rootStyle = getComputedStyle(document.documentElement);
+  const cssVar = name => rootStyle.getPropertyValue(name).trim();
+  const divColors = [cssVar("--div-neg"), cssVar("--div-mid"), cssVar("--div-pos")];
+  const noDataColor = cssVar("--div-none");
+  const colorScale = d3.scaleDiverging(d3.piecewise(d3.interpolateRgb, divColors))
+    .domain([minDelta, 0, maxDelta]);
+
+  const fmtDelta = v => v > 0 ? `+${v}` : v < 0 ? `${v}` : "Sin cambios";
+
+  const COLS = 11, ROWS = 8;
+  const CELL = 80, GAP = 3;
+  const GRID_W = COLS * CELL, GRID_H = ROWS * CELL;
+  const GRID_X0 = (CANVAS_W - GRID_W) / 2, GRID_Y0 = (HEIGHT - GRID_H) / 2;
+
+  function squarePath(col, row) {
+    const x = GRID_X0 + col * CELL + GAP / 2;
+    const y = GRID_Y0 + row * CELL + GAP / 2;
+    const s = CELL - GAP;
+    return `M${x},${y}H${x + s}V${y + s}H${x}Z`;
+  }
+  function squareCentroid(col, row) {
+    return [GRID_X0 + col * CELL + CELL / 2, GRID_Y0 + row * CELL + CELL / 2];
+  }
+
+  function largestRingPath(feature, projection) {
+    const geom = feature.geometry;
+    const polygons = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+    let best = null, bestArea = -1;
+    for (const poly of polygons) {
+      const ring = poly[0];
+      const pts = ring.map(pt => projection(pt)).filter(Boolean);
+      if (pts.length < 3) continue;
+      const area = Math.abs(d3.polygonArea(pts));
+      if (area > bestArea) { bestArea = area; best = pts; }
+    }
+    if (!best) return null;
+    return `M${best.map(p => p.join(",")).join("L")}Z`;
+  }
+
+  let topo;
+  try {
+    topo = await d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json");
+  } catch (err) {
+    statusEl.textContent = "Could not load state boundary data — check your network connection.";
+    return;
+  }
+
+  const objectKey = topo.objects.states ? "states" : Object.keys(topo.objects)[0];
+  const fc = topojson.feature(topo, topo.objects[objectKey]);
+  const features = fc.features.filter(f => {
+    const abbr = FIPS_TO_ABBR[String(f.id).padStart(2, "0")];
+    return abbr && GRID[abbr];
+  });
+
+  const projection = d3.geoAlbersUsa().fitSize([WIDTH, HEIGHT], fc);
+  const geoPath = d3.geoPath(projection);
+
+  const LABEL_OFFSETS = {
+    MI: [6, 20],
+    LA: [-14, 0],
+    CA: [-10, 0],
+    FL: [10, 0],
+    MA: [0, -2]
+  };
+
+  const states = features.map(f => {
+    const abbr = FIPS_TO_ABBR[String(f.id).padStart(2, "0")];
+    const [col, row] = GRID[abbr];
+    const geoD = largestRingPath(f, projection);
+    const fullGeoD = geoPath(f);
+    const gridD = squarePath(col, row);
+    const geoC = geoPath.centroid(f);
+    const gridC = squareCentroid(col, row);
+    const offset = LABEL_OFFSETS[abbr] || [0, 0];
+    const labelGeoC = [geoC[0] + offset[0], geoC[1] + offset[1]];
+    const row_ = DATA[abbr];
+    return {
+      id: f.id,
+      abbr,
+      name: row_ ? row_.name : f.properties.name,
+      geoD, fullGeoD, gridD,
+      geoC, gridC, labelGeoC,
+      hasData: !!row_,
+      delta: row_ ? row_.delta : null,
+      value: row_ ? row_.value : null,
+      small: CALLOUT_STATES.includes(abbr),
+      lineStart: [geoC[0], geoC[1] + (CALLOUT_SHIFT[abbr] || 0)],
+      anchor: CALLOUT_STATES.includes(abbr)
+        ? [CALLOUT_X, geoC[1] + (CALLOUT_SHIFT[abbr] || 0) + (CALLOUT_Y_OFFSET[abbr] || 0)]
+        : null,
+      fill: row_ ? colorScale(row_.delta) : noDataColor,
+      interp: flubber.interpolate(geoD, gridD, { maxSegmentLength: 6 })
+    };
+  });
+
+  statusEl.remove();
+
+  const gStates = svg.append("g");
+  const gLines = svg.append("g");
+  const gLabels = svg.append("g");
+  const gSmallLabels = svg.append("g");
+  const gCallouts = svg.append("g");
+
+  function tooltipHtml(d) {
+    return `<strong>${d.name}</strong><br>` +
+      (d.hasData
+        ? `<span class="sub">${fmtDelta(d.delta)} · ${d.value} en total</span>`
+        : `<span class="sub">No voting House seat</span>`);
+  }
+
+  const paths = gStates.selectAll("path.state")
+    .data(states, d => d.id)
+    .join("path")
+    .attr("class", "state")
+    .attr("d", d => d.fullGeoD)
+    .attr("fill", d => d.fill)
+    .on("mouseenter", function (event, d) {
+      paths.classed("is-hover", false);
+      d3.select(this).classed("is-hover", true).raise();
+    })
+    .on("mousemove", (event, d) => {
+      tooltip
+        .style("left", event.clientX + "px")
+        .style("top", event.clientY + "px")
+        .style("opacity", 1)
+        .html(tooltipHtml(d));
+    })
+    .on("mouseleave", function () {
+      d3.select(this).classed("is-hover", false);
+      tooltip.style("opacity", 0);
+    })
+    .on("touchstart", function (event, d) {
+      event.preventDefault();
+      paths.classed("is-hover", false);
+      d3.select(this).classed("is-hover", true).raise();
+      const touch = event.touches[0];
+      tooltip
+        .style("left", touch.clientX + "px")
+        .style("top", touch.clientY + "px")
+        .style("opacity", 1)
+        .html(tooltipHtml(d));
+    });
+
+  document.addEventListener("touchstart", event => {
+    if (!event.target.closest("path.state")) {
+      paths.classed("is-hover", false);
+      tooltip.style("opacity", 0);
+    }
+  });
+
+  svg.on("mouseleave", () => {
+    paths.classed("is-hover", false);
+    tooltip.style("opacity", 0);
+  });
+
+  const normalStates = states.filter(d => !d.small && d.abbr !== "DC");
+  const smallStates = states.filter(d => d.small);
+
+  const calloutLines = gLines.selectAll("polyline.callout-line")
+    .data(smallStates, d => d.id)
+    .join("polyline")
+    .attr("class", "callout-line")
+    .attr("points", d => `${d.lineStart[0]},${d.lineStart[1]} ${d.anchor[0] - CALLOUT_RUN},${d.anchor[1]} ${d.anchor[0]},${d.anchor[1]}`)
+    .attr("opacity", 0);
+
+  const normalLabels = gLabels.selectAll("g.state-label")
+    .data(normalStates, d => d.id)
+    .join("g")
+    .attr("class", "state-label");
+
+  normalLabels.filter(d => d.hasData)
+    .append("text")
+    .attr("class", "carto-abbr")
+    .attr("dy", -13)
+    .attr("opacity", 0)
+    .text(d => d.abbr);
+
+  normalLabels.filter(d => d.hasData)
+    .append("text")
+    .attr("class", "value")
+    .attr("dy", 0)
+    .text(d => d.value);
+
+  normalLabels.filter(d => !d.hasData)
+    .append("text")
+    .attr("class", "abbr")
+    .attr("dy", 0)
+    .text(d => d.abbr);
+
+  const normalCartoAbbr = gLabels.selectAll("text.carto-abbr");
+  const normalValueTexts = gLabels.selectAll("text.value");
+
+  const smallInteriorLabels = gSmallLabels.selectAll("g.state-label")
+    .data(smallStates, d => d.id)
+    .join("g")
+    .attr("class", "state-label")
+    .attr("transform", d => `translate(${d.gridC[0]},${d.gridC[1]})`)
+    .attr("opacity", 0);
+
+  smallInteriorLabels.filter(d => d.hasData)
+    .append("text")
+    .attr("class", "carto-abbr")
+    .attr("dy", -13)
+    .text(d => d.abbr);
+
+  smallInteriorLabels.filter(d => d.hasData)
+    .append("text")
+    .attr("class", "value")
+    .attr("dy", 13)
+    .text(d => d.value);
+
+  smallInteriorLabels.filter(d => !d.hasData)
+    .append("text")
+    .attr("class", "abbr")
+    .attr("dy", 0)
+    .text(d => d.abbr);
+
+  const smallCartoAbbr = gSmallLabels.selectAll("text.carto-abbr");
+  const smallValueTexts = gSmallLabels.selectAll("text.value");
+
+  const callouts = gCallouts.selectAll("g.callout")
+    .data(smallStates, d => d.id)
+    .join("g")
+    .attr("class", "callout")
+    .attr("transform", d => `translate(${d.anchor[0] + CALLOUT_GAP},${d.anchor[1]})`)
+    .attr("opacity", 0);
+
+  callouts.append("text")
+    .attr("class", "callout-value")
+    .attr("dy", 0)
+    .text(d => d.hasData ? `${d.value}` : "no voting seat");
+
+  const BASE_DY = 13;
+  const labelOpacity = d3.scaleLinear().domain([0.35, 0.75]).range([0, 1]).clamp(true);
+  const valueDy = d3.scaleLinear().domain([0.35, 0.75]).range([0, 1]).clamp(true);
+  const calloutOpacity = d3.scaleLinear().domain([0.15, 0.4]).range([1, 0]).clamp(true);
+  let dyMagnitude = BASE_DY;
+
+  svg.selectAll("g.state-label text")
+    .style("text-shadow", d => d.hasData && Math.abs(d.delta) >= 3
+      ? "0 0 2px rgba(255,255,255,0.55), 0 0 1px rgba(255,255,255,0.55), 1px 1px 1px rgba(255,255,255,0.55), -1px -1px 1px rgba(255,255,255,0.55), 1px -1px 1px rgba(255,255,255,0.55), -1px 1px 1px rgba(255,255,255,0.55)"
+      : "0 0 1.5px rgba(255,255,255,0.45), 0 0 0.75px rgba(255,255,255,0.45), 0.75px 0.75px 0.75px rgba(255,255,255,0.45), -0.75px -0.75px 0.75px rgba(255,255,255,0.45), 0.75px -0.75px 0.75px rgba(255,255,255,0.45), -0.75px 0.75px 0.75px rgba(255,255,255,0.45)");
+
+  const toggleBtn = document.getElementById("toggle");
+  const labelGeo = document.getElementById("labelGeo");
+  const labelCarto = document.getElementById("labelCarto");
+
+  function update(t) {
+    paths.attr("d", d => t === 0 ? d.fullGeoD : d.interp(t));
+    paths.attr("opacity", d => d.abbr === "DC" ? 1 - t : 1);
+    normalLabels.attr("transform", d => {
+      const x = d.labelGeoC[0] + (d.gridC[0] - d.labelGeoC[0]) * t;
+      const y = d.labelGeoC[1] + (d.gridC[1] - d.labelGeoC[1]) * t;
+      return `translate(${x},${y})`;
+    });
+    normalCartoAbbr.attr("opacity", labelOpacity(t));
+    normalValueTexts.attr("dy", valueDy(t) * dyMagnitude);
+    smallInteriorLabels.attr("opacity", labelOpacity(t));
+    callouts.attr("opacity", calloutOpacity(t));
+    calloutLines.attr("opacity", calloutOpacity(t));
+    toggleBtn.setAttribute("aria-checked", t > 0.5);
+    labelGeo.classList.toggle("active", t <= 0.5);
+    labelCarto.classList.toggle("active", t > 0.5);
+  }
+
+  let currentT = 0;
+  let timer = null;
+
+  function stopAnim() {
+    if (timer) { timer.stop(); timer = null; }
+  }
+
+  function animateTo(target) {
+    stopAnim();
+    const start = currentT;
+    const duration = 500;
+    timer = d3.timer(elapsed => {
+      const tt = Math.min(1, elapsed / duration);
+      const eased = d3.easeCubicInOut(tt);
+      currentT = start + (target - start) * eased;
+      update(currentT);
+      if (tt >= 1) { timer.stop(); timer = null; }
+    });
+  }
+
+  toggleBtn.addEventListener("click", () => animateTo(currentT <= 0.5 ? 1 : 0));
+
+  const legendBuckets = document.getElementById("legendBuckets");
+  for (let v = minDelta; v <= maxDelta; v++) {
+    const bucket = document.createElement("div");
+    bucket.className = "legend-bucket";
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.background = v === 0 ? cssVar("--div-mid") : colorScale(v);
+    const label = document.createElement("span");
+    label.textContent = v > 0 ? `+${v}` : `${v}`;
+    bucket.append(swatch, label);
+    legendBuckets.append(bucket);
+  }
+
+  document.getElementById("noDataNote").style.display = SHOW_NO_DATA_NOTE ? "" : "none";
+
+  const MIN_LABEL_PX = 12;
+  const MIN_DY_PX = 8;
+  const MAX_DY = 18;
+  const BASE_VALUE_SIZE = 14, BASE_ABBR_SIZE = 10;
+  const valueTexts = svg.selectAll("text.value, text.callout-value");
+  const abbrTexts = svg.selectAll("text.abbr, text.carto-abbr");
+
+  function applyMinLabelSize() {
+    const renderedWidth = svg.node().getBoundingClientRect().width;
+    if (!renderedWidth) return;
+    const scale = renderedWidth / 1120;
+    const minViewBoxSize = MIN_LABEL_PX / scale;
+    const valueSize = Math.max(BASE_VALUE_SIZE, minViewBoxSize);
+    const abbrSize = Math.max(BASE_ABBR_SIZE, minViewBoxSize);
+    valueTexts.style("font-size", valueSize + "px");
+    abbrTexts.style("font-size", abbrSize + "px");
+
+    dyMagnitude = Math.min(MAX_DY, Math.max(BASE_DY, MIN_DY_PX / scale));
+    normalCartoAbbr.attr("dy", -dyMagnitude);
+    smallCartoAbbr.attr("dy", -dyMagnitude);
+    smallValueTexts.attr("dy", dyMagnitude);
+    normalValueTexts.attr("dy", valueDy(currentT) * dyMagnitude);
+  }
+
+  applyMinLabelSize();
+  window.addEventListener("resize", applyMinLabelSize);
+
+  if (window.innerWidth < 500) {
+    currentT = 1;
+    update(1);
+  } else {
+    update(0);
+  }
+})();
+</script>
+</body>
+</html>
