@@ -37,7 +37,7 @@
   .subtitle{
     font-size: 13px;
     color: #555;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
   }
 
 
@@ -62,8 +62,10 @@
   .state text{ fill: #111; }
   .state:hover rect.tile{ stroke: #FFD200; stroke-width: 4; }
   /* states with a key date today */
+  .state.soon rect.tile{ fill: #FFEE99; }
   .state.today rect.tile{ fill: #FFD200; }
   #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
+  #mapLegend .swatch.soonState{ background: #FFEE99; border: none; }
 
   /* calendar section */
   /* map and calendar sit side by side on wide screens, stacked otherwise */
@@ -82,14 +84,14 @@
   .sectionTitle{
     font-family: "BentonStrong", system-ui, sans-serif;
     font-size: 18px;
-    margin-bottom: 22px;
+    margin-bottom: 30px;
   }
   #calLegend, #mapLegend{
     display: flex;
     flex-wrap: wrap;
     gap: 4px 12px;
     font-size: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 24px;
   }
   #calLegend .item, #mapLegend .item{ display: flex; align-items: center; gap: 5px; }
   #calLegend .swatch, #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; }
@@ -308,6 +310,17 @@ function drawMap(){
     it.append("span").attr("class", "type").text(`${t} today (${long(TODAY)}):`);
     it.append("span").text(list.join(", "));
   });
+
+  // lighter fill for states with a key date in the next SOON_DAYS days (after today)
+  const SOON_DAYS = 10;
+  const soonDates = d3.range(1, SOON_DAYS + 1).map(k => fmtISO(d3.timeDay.offset(parse(TODAY), k)));
+  const soonStates = new Set(soonDates.flatMap(iso => [...dayInfo(iso).states]));
+  state.classed("soon", d => soonStates.has(d.name) && !todayStates.has(d.name));
+  if (soonStates.size) {
+    const it = d3.select("#mapLegend").append("div").attr("class", "item");
+    it.append("span").attr("class", "swatch soonState");
+    it.append("span").text(`Key date in the next ${SOON_DAYS} days (${short(soonDates[0])} – ${short(soonDates[SOON_DAYS - 1])})`);
+  }
 
   state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
 }
