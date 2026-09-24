@@ -302,6 +302,7 @@ function drawMap(){
     .on("mouseenter", function(e, d){
       d3.select(this).raise(); // keep the hover outline above neighboring tiles
       renderPopup(d.name);
+      positionPopup(e); // taps on touch screens fire no mousemove, so place it now
     })
     .on("mousemove", positionPopup)
     .on("mouseleave", () => {
@@ -357,6 +358,11 @@ function positionPopup(event){
   tip.style.left = Math.max(m, x) + "px";
   tip.style.top = y + "px";
 }
+
+// on touch screens there is no mouseleave, so a tap anywhere but a state or a dated day closes the popup
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".state, .day.has")) d3.select("#tooltip").style("display", "none");
+});
 
 /* ---------- popup ---------- */
 function renderPopup(abbr){
@@ -566,6 +572,7 @@ function drawCalendar(){
       .filter(d => !d.empty && d.evs.length)
       .on("mouseenter", (e, d) => {
         renderDayPopup(d);
+        positionPopup(e);
       })
       .on("mousemove", positionPopup)
       .on("mouseleave", () => {
