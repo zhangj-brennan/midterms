@@ -133,15 +133,12 @@
   .day.has:hover{ background: #ED1C24 !important; color: #fff; }
   /* today's date, read from the viewer's clock on load */
   .day.today{
-    outline: 2px solid #111;
-    outline-offset: 1px;
+    background: #FFD200 !important;
     font-family: "BentonStrong", system-ui, sans-serif;
     color: #111;
-    position: relative;
-    z-index: 1;
   }
-  .day.today.dark{ color: #fff; }
-  #calLegend .swatch.today{ background: #fff; outline: 2px solid #111; outline-offset: -1px; border: none; }
+  .day.today.has:hover{ background: #ED1C24 !important; color: #fff; }
+  #calLegend .swatch.today{ background: #FFD200; border: none; }
 
   #tooltip .stateList{ color: #111; }
 
@@ -518,21 +515,23 @@ function renderDayPopup(d){
     `Key dates in ${d.n} state${d.n === 1 ? "" : "s"}`
   );
 
-  todayByType(d.evs).forEach(([t, list]) => {
+  todayByType(d.evs, true).forEach(([t, list]) => {
     const h = panel.append("h3").text(t + " ");
     h.append("span").attr("class", "count").text(`(${list.length} state${list.length === 1 ? "" : "s"})`);
     panel.append("div").attr("class", "stateList").text(list.join(", "));
   });
 }
 
-/* A day's events as [type, state labels] pairs in EVENT_TYPES order, Election Day left out. */
-function todayByType(evs){
+/* A day's events as [type, state labels] pairs in EVENT_TYPES order, Election Day left out.
+   fullNames labels states by name instead of abbreviation. */
+function todayByType(evs, fullNames){
   const byType = d3.group(evs, e => e.type);
+  const label = abbr => fullNames ? STATE_DATES[abbr].name : abbr;
   return EVENT_TYPES.filter(t => byType.has(t) && t !== "Election Day").map(t => [t,
     byType.get(t)
       .sort((a, b) => STATE_DATES[a.state].name.localeCompare(STATE_DATES[b.state].name))
       .map(e => e.detail && t === "Registration deadline" && e.detail !== "online, mail, in person"
-        ? `${e.state} (${e.detail})` : e.state)
+        ? `${label(e.state)} (${e.detail})` : label(e.state))
   ]);
 }
 
