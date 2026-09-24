@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Midterm Key Dates by State</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="state_dates_2026.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    border-top: 3px solid black;
+  }
+
+  .subtitle{
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 8px;
+  }
+
+
+  #map svg{
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .state{ cursor: pointer; }
+  .state text{
+    text-anchor: middle;
+    user-select: none;
+    pointer-events: none;
+  }
+  .state .abbr{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+  }
+  .state rect.tile{ fill: #DCDCDC; stroke: #fff; stroke-width: 2; }
+  .state text{ fill: #111; }
+  .state:hover rect.tile, .state.hl rect.tile{ fill: #ED1C24; }
+  .state:hover text, .state.hl text{ fill: #fff; }
+  /* states with a key date today */
+  .state rect.todayBox{ fill: none; stroke: #111; stroke-width: 3; pointer-events: none; }
+
+  /* calendar section */
+  /* map and calendar sit side by side on wide screens, stacked otherwise */
+  #panels{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 56px;
+    align-items: start;
+  }
+  .panel{ max-width: 400px; }
+
+  .section{
+    border-top: 3px solid black;
+    padding-top: 10px;
+  }
+  .sectionTitle{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    margin-bottom: 22px;
+  }
+  #calLegend, #mapLegend{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  #calLegend .item, #mapLegend .item{ display: flex; align-items: center; gap: 5px; }
+  #calLegend .swatch, #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; }
+  #calendar{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 20px;
+  }
+  .month h4{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 14px;
+    margin: 0 0 4px;
+  }
+  .days{
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+  }
+  .dow{
+    font-size: 10px;
+    color: #777;
+    text-align: center;
+    padding-bottom: 2px;
+  }
+  .day{
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #999;
+    background: #f5f5f5;
+  }
+  .day.empty{ background: none; }
+  .day.has{ color: #111; cursor: pointer; font-family: "BentonMedium", system-ui, sans-serif; }
+  .day.dark{ color: #fff; }
+  .day.has:hover, .day.hl{ outline: 2px solid #111; outline-offset: -2px; }
+  /* today's date, read from the viewer's clock on load */
+  .day.today{
+    outline: 2px solid #111;
+    outline-offset: 1px;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    color: #111;
+    position: relative;
+    z-index: 1;
+  }
+  .day.today.dark{ color: #fff; }
+  #calLegend .swatch.today, #mapLegend .swatch.today{ background: #fff; outline: 2px solid #111; outline-offset: -1px; border: none; }
+
+  #tooltip .stateList{ color: #111; }
+
+  /* hover popup with a state's full calendar */
+  #tooltip{
+    position: fixed;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid #111;
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    padding: 10px 12px;
+    font-size: 12px;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    display: none;
+    z-index: 10;
+  }
+  #tooltip h2{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 17px;
+    margin: 0 0 2px;
+  }
+  #tooltip .electionName{ color: #555; margin-bottom: 6px; }
+  #tooltip h3{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    margin: 9px 0 3px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #ddd;
+  }
+  #tooltip ul{ list-style: none; margin: 0; padding: 0; }
+  #tooltip li{ margin: 0 0 3px; line-height: 1.3; }
+  #tooltip .when{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #tooltip .when.past{ color: #888; text-decoration: line-through; }
+  #tooltip .how{ color: #555; }
+  #tooltip .note{ color: #777; font-size: 11px; display: block; }
+
+  #footer{ margin-top: 20px; font-size: 12px; color: #555; }
+  #footer a{ color: #555; }
+
+  @media (max-width: 832px){
+    #panels{ grid-template-columns: 1fr; gap: 48px; }
+  }
+  @media (max-width: 700px){
+    body{ padding: 10px; }
+  }
+</style>
+</head>
+
+<body>
+<div id="wrapper">
+  <div id="panels">
+    <div class="panel">
+      <div id="title">2026 Midterm Election: By State</div>
+      <div class="subtitle">Hover over a state to see its key dates.</div>
+      <div id="mapLegend"></div>
+      <div id="map"></div>
+    </div>
+
+    <div class="panel section">
+      <div class="sectionTitle">2026 Midterm Election: Key Dates</div>
+      <div id="calLegend"></div>
+      <div id="calendar"></div>
+    </div>
+  </div>
+
+  <div id="footer">
+    Sources: <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a>
+    (deadlines for domestic voters) and <a href="https://www.vote411.org/" target="_blank">VOTE411</a>
+    (registration deadlines by method). Data collected September 24, 2026. Confirm with your state or local election office.
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Classic Bostock-style state tile layout, with DC added -->
+<script id="grid" type="text/plain">
+                              ME
+               WI          VT NH
+WA ID MT ND MN IL MI    NY MA
+OR NV WY SD IA IN OH PA NJ CT RI
+CA UT CO NE MO KY WV VA MD DE
+   AZ NM KS AR TN NC SC    DC
+         OK LA MS AL GA
+HI AK    TX             FL
+</script>
+
+<script>
+/* =========================================================
+   CONFIG
+========================================================= */
+const ELECTION_DAY = "2026-11-03";
+const TODAY = d3.timeFormat("%Y-%m-%d")(new Date());
+
+const CONFIG = {
+  tileSize: 58,
+  tileGapFactor: 1.08
+};
+/* ======================================================= */
+
+const fmtShort = d3.timeFormat("%b %-d");
+const fmtLong  = d3.timeFormat("%a, %b %-d");
+const parse    = d3.timeParse("%Y-%m-%d");
+const short = iso => fmtShort(parse(iso));
+const long  = iso => fmtLong(parse(iso));
+
+function parseStateGridText(gridText){
+  const states = [];
+  gridText.split("\n").forEach((line, i) => {
+    const re = /\w+/g;
+    let m;
+    while ((m = re.exec(line))) {
+      states.push({ name: m[0], x: m.index / 3, y: i });
+    }
+  });
+  return states;
+}
+const GRID_STATES = parseStateGridText(document.getElementById("grid").textContent)
+  .filter(d => STATE_DATES[d.name]);
+// drop leading blank rows/columns so the map starts at the top-left
+const minY = d3.min(GRID_STATES, d => d.y), minX = d3.min(GRID_STATES, d => d.x);
+GRID_STATES.forEach(d => { d.y -= minY; d.x -= minX; });
+
+/* ---------- map ---------- */
+function drawMap(){
+  const tileSize = CONFIG.tileSize;
+  const cellSize = Math.round(tileSize * CONFIG.tileGapFactor);
+  const gridWidth = d3.max(GRID_STATES, d => d.x) + 1;
+  const gridHeight = d3.max(GRID_STATES, d => d.y) + 1;
+  const w = gridWidth * cellSize;
+  const h = gridHeight * cellSize;
+
+  const svg = d3.select("#map").append("svg")
+    .attr("viewBox", `0 0 ${w} ${h}`)
+    .attr("role", "img")
+    .attr("aria-label", "Tile map of U.S. states");
+
+  const state = svg.selectAll(".state")
+    .data(GRID_STATES, d => d.name)
+    .enter()
+    .append("g")
+    .attr("class", "state")
+    .attr("transform", d => `translate(${d.x * cellSize + cellSize/2}, ${d.y * cellSize + cellSize/2})`)
+    .on("mouseenter", (e, d) => {
+      renderPopup(d.name);
+      d3.selectAll(".day").classed("hl", c => c.states && c.states.has(d.name));
+    })
+    .on("mousemove", positionPopup)
+    .on("mouseleave", () => {
+      d3.select("#tooltip").style("display", "none");
+      d3.selectAll(".day").classed("hl", false);
+    });
+
+  state.append("rect").attr("class", "tile")
+    .attr("x", -tileSize/2).attr("y", -tileSize/2)
+    .attr("width", tileSize).attr("height", tileSize);
+  // outline states that have a key date today (same "today" as the calendar ring)
+  const todayStates = dayInfo(TODAY).states;
+  state.filter(d => todayStates.has(d.name))
+    .append("rect").attr("class", "todayBox")
+    .attr("x", -tileSize/2 + 1.5).attr("y", -tileSize/2 + 1.5)
+    .attr("width", tileSize - 3).attr("height", tileSize - 3);
+  if (todayStates.size) {
+    const it = d3.select("#mapLegend").append("div").attr("class", "item");
+    it.append("span").attr("class", "swatch today");
+    it.append("span").text(`Key date today (${long(TODAY)})`);
+  }
+
+  state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
+}
+
+function positionPopup(event){
+  const tip = document.getElementById("tooltip");
+  const pad = 14, m = 8;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = event.clientX + pad, y = event.clientY + pad;
+  // flip to the other side of the cursor when it would overflow the viewport
+  if (x + w > window.innerWidth - m) x = event.clientX - pad - w;
+  if (y + h > window.innerHeight - m) y = Math.max(m, window.innerHeight - m - h);
+  tip.style.left = Math.max(m, x) + "px";
+  tip.style.top = y + "px";
+}
+
+/* ---------- popup ---------- */
+function itemWhen(i){
+  if (i.start) return i.end ? `${short(i.start)} – ${short(i.end)}` : `From ${short(i.start)}`;
+  if (i.date) return long(i.date) + (i.time ? `, ${i.time.replace(":00", "").toLowerCase()}` : "");
+  return i.text;
+}
+function isPast(i){
+  const last = i.end || i.date;
+  return last && last < TODAY;
+}
+
+function renderPopup(abbr){
+  const panel = d3.select("#tooltip").html("").style("display", "block");
+  const s = STATE_DATES[abbr];
+  panel.append("h2").text(s.name);
+  panel.append("div").attr("class", "electionName").text(s.election + " · " + long(ELECTION_DAY));
+
+  const sections = [
+    ["Register to vote", null],
+    ["Request a mail ballot", s.mailRequest],
+    ["Return a mail ballot", s.mailReturn],
+    ["Early / in-person absentee voting", s.earlyVoting]
+  ];
+
+  sections.forEach(([heading, items]) => {
+    panel.append("h3").text(heading);
+    const ul = panel.append("ul");
+
+    if (heading === "Register to vote") {
+      const r = s.registrationByMethod;
+      const rows = [["online", "Online"], ["mail", "By mail"], ["inPerson", "In person"]]
+        .filter(([k]) => r[k])
+        .map(([k, lab]) => ({ how: lab + (r[k].qualifier ? ` (${r[k].qualifier})` : ""), date: r[k].date }));
+      if (!rows.length) {
+        ul.append("li").text("No voter registration required.");
+      }
+      rows.forEach(row => {
+        const li = ul.append("li");
+        li.append("span").attr("class", "how").text(row.how + ": ");
+        li.append("span").attr("class", "when").classed("past", row.date < TODAY).text(long(row.date));
+      });
+      // same-day / election-day registration windows from U.S. Vote
+      (s.registration || []).filter(i => /Same Day|Election Day/i.test(i.label)).forEach(i => addItem(ul, i));
+      return;
+    }
+
+    (items || []).forEach(i => addItem(ul, i));
+  });
+
+  if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(s.note);
+}
+
+function addItem(ul, i){
+  const li = ul.append("li");
+  const how = i.label.replace(/\s+by$/i, "");
+  if (how) li.append("span").attr("class", "how").text(how + ": ");
+  li.append("span").attr("class", "when").classed("past", isPast(i)).text(itemWhen(i));
+  if (i.note) li.append("span").attr("class", "note").text(i.note);
+}
+
+/* ---------- calendar ---------- */
+const MONTHS = [8, 9, 10]; // Sep–Nov (0-based months), 2026
+
+// Days shaded by how many states have a key date that day; Election Day stands apart.
+const CAL_BINS = [
+  { label: "1–2 states",  min: 1,  fill: "#FDE3E3" },
+  { label: "3–5",         min: 3,  fill: "#F9B4B5" },
+  { label: "6–10",        min: 6,  fill: "#F4787B" },
+  { label: "11 or more",  min: 11, fill: "#ED1C24", dark: true }
+];
+const ELECTION_FILL = "#111";
+
+// Event types, in the order they appear in the popup
+const EVENT_TYPES = [
+  "Election Day",
+  "Registration deadline",
+  "Mail ballot request deadline",
+  "Early voting begins",
+  "Early voting ends",
+  "Mail ballots due",
+  "Mail ballots due if postmarked by Election Day"
+];
+
+/* Flatten every state's record into { date, type, state, detail } events. */
+function buildEvents(){
+  const events = [];
+  const add = (date, type, state, detail) => date && events.push({ date, type, state, detail });
+
+  Object.entries(STATE_DATES).forEach(([abbr, s]) => {
+    // registration: one event per date, listing the methods that close that day
+    const byDate = d3.group(
+      [["online", "online"], ["mail", "mail"], ["inPerson", "in person"]]
+        .filter(([k]) => s.registrationByMethod[k] && s.registrationByMethod[k].date !== ELECTION_DAY)
+        .map(([k, lab]) => ({ date: s.registrationByMethod[k].date, lab })),
+      d => d.date
+    );
+    byDate.forEach((rows, date) => add(date, "Registration deadline", abbr, rows.map(r => r.lab).join(", ")));
+
+    const req = (s.mailRequest || []).find(i => i.date);
+    if (req) add(req.date, "Mail ballot request deadline", abbr);
+
+    const starts = (s.earlyVoting || []).filter(i => i.start).map(i => i.start).sort();
+    const ends = (s.earlyVoting || []).filter(i => i.end).map(i => i.end).sort();
+    if (starts.length) add(starts[0], "Early voting begins", abbr);
+    if (ends.length) add(ends[ends.length - 1], "Early voting ends", abbr);
+
+    const returns = (s.mailReturn || []).filter(i => i.date);
+    const post = returns.find(i => /Postmarked/i.test(i.label));
+    if (post) add(post.date, "Mail ballots due if postmarked by Election Day", abbr);
+    const received = returns.filter(i => i !== post).map(i => i.date).sort();
+    if (received.length) add(received[received.length - 1], "Mail ballots due", abbr);
+
+    add(ELECTION_DAY, "Election Day", abbr);
+  });
+  return events;
+}
+
+const EVENTS_BY_DATE = d3.group(buildEvents(), d => d.date);
+const fmtISO = d3.timeFormat("%Y-%m-%d");
+const fmtDay = d3.timeFormat("%A, %B %-d");
+
+function dayInfo(iso){
+  const evs = EVENTS_BY_DATE.get(iso) || [];
+  // Election Day itself doesn't count toward the shading
+  const states = new Set(evs.filter(e => e.type !== "Election Day").map(e => e.state));
+  return { evs, states, n: states.size };
+}
+
+function dayStyle(iso, n){
+  if (iso === ELECTION_DAY) return { fill: ELECTION_FILL, dark: true };
+  if (!n) return null;
+  return CAL_BINS.filter(b => n >= b.min).pop();
+}
+
+function drawCalendar(){
+  const legend = d3.select("#calLegend");
+  const items = [{ label: "Election Day", fill: ELECTION_FILL }];
+  if (TODAY >= "2026-09-01" && TODAY <= "2026-11-30") items.push({ label: `Today (${long(TODAY)})`, today: true });
+  const it = legend.selectAll(".item").data(items).join("div").attr("class", "item");
+  it.append("span").attr("class", "swatch").classed("today", d => d.today).style("background", d => d.fill);
+  it.append("span").text(d => d.label);
+
+  const months = d3.select("#calendar").selectAll(".month")
+    .data(MONTHS)
+    .join("div")
+    .attr("class", "month");
+
+  months.append("h4").text(m => d3.timeFormat("%B")(new Date(2026, m, 1)));
+
+  const grid = months.append("div").attr("class", "days");
+  grid.selectAll(".dow").data(["S", "M", "T", "W", "T", "F", "S"]).join("div").attr("class", "dow").text(d => d);
+
+  grid.each(function(m){
+    const first = new Date(2026, m, 1);
+    const cells = d3.range(first.getDay()).map(() => ({ empty: true }))
+      .concat(d3.timeDays(first, new Date(2026, m + 1, 1)).map(date => {
+        const iso = fmtISO(date);
+        return { date, iso, ...dayInfo(iso) };
+      }));
+
+    d3.select(this).selectAll(".day")
+      .data(cells)
+      .join("div")
+      .attr("class", "day")
+      .classed("empty", d => d.empty)
+      .classed("has", d => !d.empty && d.evs.length > 0)
+      .classed("today", d => d.iso === TODAY)
+      .each(function(d){
+        if (d.empty) return;
+        const st = dayStyle(d.iso, d.n);
+        d3.select(this)
+          .text(d.date.getDate())
+          .classed("dark", !!(st && st.dark))
+          .style("background", st ? st.fill : null);
+      })
+      .filter(d => !d.empty && d.evs.length)
+      .on("mouseenter", (e, d) => {
+        renderDayPopup(d);
+        d3.selectAll(".state").classed("hl", s => d.states.has(s.name) || d.iso === ELECTION_DAY);
+      })
+      .on("mousemove", positionPopup)
+      .on("mouseleave", () => {
+        d3.select("#tooltip").style("display", "none");
+        d3.selectAll(".state").classed("hl", false);
+      });
+  });
+}
+
+function renderDayPopup(d){
+  const panel = d3.select("#tooltip").html("").style("display", "block");
+  panel.append("h2").text(fmtDay(d.date));
+  panel.append("div").attr("class", "electionName").text(
+    d.iso === ELECTION_DAY ? "General election in every state" :
+    `Key dates in ${d.n} state${d.n === 1 ? "" : "s"}`
+  );
+
+  const byType = d3.group(d.evs, e => e.type);
+  EVENT_TYPES.filter(t => byType.has(t) && t !== "Election Day").forEach(t => {
+    panel.append("h3").text(t);
+    const list = byType.get(t)
+      .sort((a, b) => STATE_DATES[a.state].name.localeCompare(STATE_DATES[b.state].name))
+      .map(e => e.detail && t === "Registration deadline" && e.detail !== "online, mail, in person"
+        ? `${e.state} (${e.detail})` : e.state);
+    panel.append("div").attr("class", "stateList").text(list.join(", "));
+  });
+}
+
+drawMap();
+drawCalendar();
+</script>
+</body>
+</html>
