@@ -62,10 +62,10 @@
   .state text{ fill: #111; }
   .state:hover rect.tile{ stroke: #FFD200; stroke-width: 4; }
   /* states with a key date today */
-  .state.soon rect.tile{ fill: #FFEE99; }
+  .state.soon rect.tile{ fill: url(#soonSplit); }
   .state.today rect.tile{ fill: #FFD200; }
   #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
-  #mapLegend .swatch.soonState{ background: #FFEE99; border: none; }
+  #mapLegend .swatch.soonState{ background: linear-gradient(to bottom right, #DCDCDC 50%, #FFD200 50%); border: none; }
 
   /* calendar section */
   /* map and calendar sit side by side on wide screens, stacked otherwise */
@@ -283,6 +283,12 @@ function drawMap(){
     .attr("role", "img")
     .attr("aria-label", "Tile map of U.S. states");
 
+  // tile split corner to corner, grey top-left and yellow bottom-right, for states with a key date coming up soon
+  const split = svg.append("defs").append("linearGradient")
+    .attr("id", "soonSplit").attr("x1", 0).attr("y1", 0).attr("x2", 1).attr("y2", 1);
+  [["50%", "#DCDCDC"], ["50%", "#FFD200"]].forEach(([o, c]) =>
+    split.append("stop").attr("offset", o).attr("stop-color", c));
+
   const state = svg.selectAll(".state")
     .data(GRID_STATES, d => d.name)
     .enter()
@@ -319,7 +325,7 @@ function drawMap(){
   if (soonStates.size) {
     const it = d3.select("#mapLegend").append("div").attr("class", "item");
     it.append("span").attr("class", "swatch soonState");
-    it.append("span").text(`Key date in the next ${SOON_DAYS} days (${short(soonDates[0])} – ${short(soonDates[SOON_DAYS - 1])})`);
+    it.append("span").text(`States with a key date in the next ${SOON_DAYS} days (${short(soonDates[0])} – ${short(soonDates[SOON_DAYS - 1])})`);
   }
 
   state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
