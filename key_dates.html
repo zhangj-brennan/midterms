@@ -177,6 +177,7 @@
   #tooltip .what{ font-family: "BentonMedium", system-ui, sans-serif; }
   /* state popup: only the date headings stay bold */
   #tooltip.statePopup h2, #tooltip.statePopup .what{ font-family: "Benton", system-ui, sans-serif; }
+  #tooltip h3 .countdown{ background: #FFD200; padding: 1px 5px; margin-left: 6px; }
   #tooltip h3.past{ color: #888; text-decoration: line-through; }
   #tooltip .note{ color: #777; font-size: 11px; display: block; }
 
@@ -331,8 +332,16 @@ function renderPopup(abbr){
   panel.append("div").attr("class", "electionName").text(s.election + " · " + long(ELECTION_DAY));
 
   const { dated, undated } = stateKeyDates(s);
-  d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b)).forEach(([date, evs]) => {
-    panel.append("h3").classed("past", date < TODAY).text(long(date));
+  const byDate = d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b));
+  const next = (byDate.find(([date]) => date >= TODAY) || [])[0];
+  byDate.forEach(([date, evs]) => {
+    const h = panel.append("h3").classed("past", date < TODAY).text(long(date));
+    // countdown to the state's next key date
+    if (date === next) {
+      const n = d3.timeDay.count(parse(TODAY), parse(date));
+      h.append("span").attr("class", "countdown")
+        .text(n === 0 ? "Today" : `In ${n} day${n === 1 ? "" : "s"}`);
+    }
     const ul = panel.append("ul");
     // Election Day leads its date; repeats of the same deadline merge into one line
     d3.groups(evs, e => e.what)
