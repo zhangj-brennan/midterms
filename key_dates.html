@@ -60,11 +60,9 @@
   }
   .state rect.tile{ fill: #DCDCDC; stroke: #fff; stroke-width: 2; }
   .state text{ fill: #111; }
-  .state:hover rect.tile{ fill: #ED1C24; }
-  .state:hover text{ fill: #fff; }
+  .state:hover rect.tile{ stroke: #FFD200; stroke-width: 4; }
   /* states with a key date today */
   .state.today rect.tile{ fill: #FFD200; }
-  .state.today:hover rect.tile{ fill: #ED1C24; }
   #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
 
   /* calendar section */
@@ -129,15 +127,14 @@
   .day.empty{ background: none; }
   .day.has{ color: #111; cursor: pointer; font-family: "BentonMedium", system-ui, sans-serif; }
   .day.dark{ color: #fff; }
-  /* hovered day: red like the map */
-  .day.has:hover{ background: #ED1C24 !important; color: #fff; }
+  /* hovered day: yellow outline like the map */
+  .day.has:hover{ outline: 3px solid #FFD200; outline-offset: 1px; position: relative; z-index: 1; }
   /* today's date, read from the viewer's clock on load */
   .day.today{
     background: #FFD200 !important;
     font-family: "BentonStrong", system-ui, sans-serif;
     color: #111;
   }
-  .day.today.has:hover{ background: #ED1C24 !important; color: #fff; }
   #calLegend .swatch.today{ background: #FFD200; border: none; }
 
   #tooltip .stateList{ color: #111; }
@@ -177,6 +174,10 @@
   #tooltip .when{ font-family: "BentonMedium", system-ui, sans-serif; }
   #tooltip .when.past{ color: #888; text-decoration: line-through; }
   #tooltip .how{ color: #555; }
+  #tooltip .what{ font-family: "BentonMedium", system-ui, sans-serif; }
+  /* state popup: only the date headings stay bold */
+  #tooltip.statePopup h2, #tooltip.statePopup .what{ font-family: "Benton", system-ui, sans-serif; }
+  #tooltip h3.past{ color: #888; text-decoration: line-through; }
   #tooltip .note{ color: #777; font-size: 11px; display: block; }
 
   #footer{ margin-top: 20px; font-size: 12px; color: #555; }
@@ -285,7 +286,8 @@ function drawMap(){
     .append("g")
     .attr("class", "state")
     .attr("transform", d => `translate(${d.x * cellSize + cellSize/2}, ${d.y * cellSize + cellSize/2})`)
-    .on("mouseenter", (e, d) => {
+    .on("mouseenter", function(e, d){
+      d3.select(this).raise(); // keep the hover outline above neighboring tiles
       renderPopup(d.name);
     })
     .on("mousemove", positionPopup)
@@ -322,63 +324,85 @@ function positionPopup(event){
 }
 
 /* ---------- popup ---------- */
-function itemWhen(i){
-  if (i.start) return i.end ? `${short(i.start)} – ${short(i.end)}` : `From ${short(i.start)}`;
-  if (i.date) return long(i.date) + (i.time ? `, ${i.time.replace(":00", "").toLowerCase()}` : "");
-  return i.text;
-}
-function isPast(i){
-  const last = i.end || i.date;
-  return last && last < TODAY;
-}
-
 function renderPopup(abbr){
-  const panel = d3.select("#tooltip").html("").style("display", "block");
+  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", true);
   const s = STATE_DATES[abbr];
   panel.append("h2").text(s.name);
   panel.append("div").attr("class", "electionName").text(s.election + " · " + long(ELECTION_DAY));
 
-  const sections = [
-    ["Register to vote", null],
-    ["Request a mail ballot", s.mailRequest],
-    ["Return a mail ballot", s.mailReturn],
-    ["Early / in-person absentee voting", s.earlyVoting]
-  ];
-
-  sections.forEach(([heading, items]) => {
-    panel.append("h3").text(heading);
+  const { dated, undated } = stateKeyDates(s);
+  d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b)).forEach(([date, evs]) => {
+    panel.append("h3").classed("past", date < TODAY).text(long(date));
     const ul = panel.append("ul");
-
-    if (heading === "Register to vote") {
-      const r = s.registrationByMethod;
-      const rows = [["online", "Online"], ["mail", "By mail"], ["inPerson", "In person"]]
-        .filter(([k]) => r[k])
-        .map(([k, lab]) => ({ how: lab + (r[k].qualifier ? ` (${r[k].qualifier})` : ""), date: r[k].date }));
-      if (!rows.length) {
-        ul.append("li").text("No voter registration required.");
-      }
-      rows.forEach(row => {
-        const li = ul.append("li");
-        li.append("span").attr("class", "how").text(row.how + ": ");
-        li.append("span").attr("class", "when").classed("past", row.date < TODAY).text(long(row.date));
-      });
-      // same-day / election-day registration windows from U.S. Vote
-      (s.registration || []).filter(i => /Same Day|Election Day/i.test(i.label)).forEach(i => addItem(ul, i));
-      return;
-    }
-
-    (items || []).forEach(i => addItem(ul, i));
+    // Election Day leads its date; repeats of the same deadline merge into one line
+    d3.groups(evs, e => e.what)
+      .sort(([a], [b]) => (b === "Election Day") - (a === "Election Day"))
+      .forEach(([what, rows]) => addKeyDate(ul, {
+        what,
+        how: rows.map(r => [r.how, r.time && r.time.replace(":00", "").toLowerCase()].filter(Boolean).join(", "))
+          .filter(Boolean).join("; "),
+        note: rows.map(r => r.note).filter(Boolean).join(" ")
+      }));
   });
+  if (undated.length) {
+    panel.append("h3").text("Other");
+    const ul = panel.append("ul");
+    undated.forEach(e => addKeyDate(ul, e));
+  }
 
   if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(s.note);
 }
 
-function addItem(ul, i){
+/* One state's deadlines as { date, what, how, time, note } rows; ranges become a start row and an end row. */
+function stateKeyDates(s){
+  const dated = [], undated = [];
+  const how = i => i.label ? i.label.replace(/\s+by$/i, "") : "";
+  const sentence = t => t.charAt(0) + t.slice(1).toLowerCase(); // "Early Voting" -> "Early voting"
+  const push = (date, what, i = {}, extra = {}) => (date ? dated : undated).push({
+    date, what,
+    how: how(i), time: i.time, note: i.note, text: date ? null : i.text, ...extra
+  });
+
+  // registration deadlines by method, merged when methods share a date
+  const r = s.registrationByMethod;
+  const methods = [["online", "online"], ["mail", "by mail"], ["inPerson", "in person"]]
+    .filter(([k]) => r[k])
+    .map(([k, lab]) => ({ date: r[k].date, lab: lab + (r[k].qualifier ? ` (${r[k].qualifier})` : "") }));
+  if (!methods.length) undated.push({ what: "No voter registration required" });
+  d3.groups(methods, m => m.date).forEach(([date, ms]) =>
+    push(date, "Registration deadline", {}, { how: ms.map(m => m.lab).join(", ") }));
+  // same-day / election-day registration windows from U.S. Vote
+  (s.registration || []).filter(i => /Same Day|Election Day/i.test(i.label)).forEach(i => {
+    if (i.start) {
+      push(i.start, "Same-day registration begins", {}, { note: i.note });
+      if (i.end) push(i.end, "Same-day registration ends");
+    } else push(i.date, "Election Day registration", {}, { time: i.time, note: i.note });
+  });
+
+  (s.mailRequest || []).forEach(i => {
+    if (i.start) {
+      push(i.start, `${sentence(how(i))} begins`, {}, { note: i.note });
+      if (i.end) push(i.end, `${sentence(how(i))} ends`);
+    } else push(i.date, "Mail ballot request deadline", i);
+  });
+  (s.mailReturn || []).forEach(i => push(i.date, "Mail ballots due", i));
+  (s.earlyVoting || []).forEach(i => {
+    const what = sentence(i.label || "Early voting");
+    if (i.start) {
+      push(i.start, `${what} begins`, {}, { note: i.note });
+      if (i.end) push(i.end, `${what} ends`);
+    } else push(null, what, i, { how: "" });
+  });
+  push(ELECTION_DAY, "Election Day");
+  return { dated, undated };
+}
+
+function addKeyDate(ul, e){
   const li = ul.append("li");
-  const how = i.label.replace(/\s+by$/i, "");
-  if (how) li.append("span").attr("class", "how").text(how + ": ");
-  li.append("span").attr("class", "when").classed("past", isPast(i)).text(itemWhen(i));
-  if (i.note) li.append("span").attr("class", "note").text(i.note);
+  li.append("span").attr("class", "what").text(e.what);
+  const bits = [e.how, e.text].filter(Boolean);
+  if (bits.length) li.append("span").attr("class", "how").text(" · " + bits.join(", "));
+  if (e.note) li.append("span").attr("class", "note").text(e.note);
 }
 
 /* ---------- calendar ---------- */
@@ -508,7 +532,7 @@ function drawCalendar(){
 }
 
 function renderDayPopup(d){
-  const panel = d3.select("#tooltip").html("").style("display", "block");
+  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", false);
   panel.append("h2").text(fmtDay(d.date));
   panel.append("div").attr("class", "electionName").text(
     d.iso === ELECTION_DAY ? "General election in every state" :
