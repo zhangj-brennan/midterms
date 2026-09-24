@@ -301,7 +301,7 @@ function drawMap(){
   // fill states that have a key date today (same "today" as the calendar ring)
   const todayStates = dayInfo(TODAY).states;
   state.classed("today", d => todayStates.has(d.name));
-  todayByType(dayInfo(TODAY).evs).forEach(([t, list]) => {
+  todayByType(dayInfo(TODAY).evs, true).forEach(([t, list]) => {
     const it = d3.select("#mapLegend").append("div").attr("class", "item");
     it.append("span").attr("class", "swatch todayState");
     it.append("span").attr("class", "type").text(`${t} today (${long(TODAY)}):`);
