@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Key Dates Test</title>
+<style>
+  @font-face { font-family: "Benton"; src: url("Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("Benton Sans/Benton Sans Bold.otf"); }
+  *{ box-sizing: border-box; }
+  html, body{ height: 100%; }
+  body{
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, sans-serif;
+  }
+  /* date picker bar */
+  #bar{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 3px solid #111;
+    font-size: 13px;
+  }
+  #bar .label{ font-family: "BentonStrong", system-ui, sans-serif; }
+  #bar #date{ font-family: "BentonStrong", system-ui, sans-serif; min-width: 140px; }
+  #bar input[type=range]{ flex: 1; min-width: 0; accent-color: #111; }
+  #bar button{
+    font: inherit;
+    border: 1px solid #111;
+    background: #fff;
+    padding: 2px 8px;
+    cursor: pointer;
+  }
+  #bar button:hover{ background: #FFD200; }
+  iframe{ flex: 1; width: 100%; border: 0; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="label">Test “today”:</span>
+  <button id="prev" title="Previous day (←)">‹</button>
+  <input id="slider" type="range" min="0" step="1" />
+  <button id="next" title="Next day (→)">›</button>
+  <span id="date"></span>
+  <button id="real">Real today</button>
+</div>
+<iframe id="page" title="Key dates page"></iframe>
+
+<script>
+// slider covers the calendar's months, Sep 1 – Nov 30, 2026
+const START = new Date(2026, 8, 1), END = new Date(2026, 10, 30);
+const DAY = 864e5;
+const slider = document.getElementById("slider");
+const frame = document.getElementById("page");
+const dateLabel = document.getElementById("date");
+slider.max = Math.round((END - START) / DAY);
+
+const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dateAt = i => new Date(START.getFullYear(), START.getMonth(), START.getDate() + i);
+
+let timer;
+function show(i, now){
+  i = Math.max(0, Math.min(+slider.max, i));
+  slider.value = i;
+  const d = dateAt(i);
+  dateLabel.textContent = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  // reload the page only once the slider settles
+  clearTimeout(timer);
+  timer = setTimeout(() => { frame.src = "key_dates.html?today=" + iso(d); }, now ? 0 : 150);
+}
+
+slider.addEventListener("input", () => show(+slider.value));
+document.getElementById("prev").onclick = () => show(+slider.value - 1, true);
+document.getElementById("next").onclick = () => show(+slider.value + 1, true);
+document.getElementById("real").onclick = () => show(Math.round((new Date().setHours(0, 0, 0, 0) - START) / DAY), true);
+document.addEventListener("keydown", e => {
+  if (e.target === slider) return; // the slider handles its own arrow keys
+  if (e.key === "ArrowLeft") show(+slider.value - 1, true);
+  if (e.key === "ArrowRight") show(+slider.value + 1, true);
+});
+
+document.getElementById("real").click();
+</script>
+</body>
+</html>

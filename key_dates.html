@@ -95,6 +95,8 @@
   }
   #calLegend .item, #mapLegend .item{ display: flex; align-items: center; gap: 5px; }
   #calLegend .swatch, #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; }
+  #mapLegend .item{ align-items: flex-start; line-height: 1.35; }
+  #mapLegend .swatch{ flex: none; margin-top: 2px; }
   #mapLegend .type{ font-family: "BentonStrong", system-ui, sans-serif; }
   #calendar{
     display: grid;
@@ -238,7 +240,9 @@ HI AK    TX             FL
    CONFIG
 ========================================================= */
 const ELECTION_DAY = "2026-11-03";
-const TODAY = d3.timeFormat("%Y-%m-%d")(new Date());
+// ?today=YYYY-MM-DD overrides the viewer's clock (used by key_dates_test.html)
+const TODAY_PARAM = new URLSearchParams(location.search).get("today");
+const TODAY = /^\d{4}-\d{2}-\d{2}$/.test(TODAY_PARAM || "") ? TODAY_PARAM : d3.timeFormat("%Y-%m-%d")(new Date());
 
 const CONFIG = {
   tileSize: 58,
@@ -310,22 +314,33 @@ function drawMap(){
   // fill states that have a key date today (same "today" as the calendar ring)
   const todayStates = dayInfo(TODAY).states;
   state.classed("today", d => todayStates.has(d.name));
-  todayByType(dayInfo(TODAY).evs, true).forEach(([t, list]) => {
+  const todayTypes = todayByType(dayInfo(TODAY).evs, true);
+  {
     const it = d3.select("#mapLegend").append("div").attr("class", "item");
     it.append("span").attr("class", "swatch todayState");
-    it.append("span").attr("class", "type").text(`${t} today (${long(TODAY)}):`);
-    it.append("span").text(list.join(", "));
-  });
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text(`Today (${long(TODAY)}): `);
+    txt.append("span").text(todayTypes.length
+      ? todayTypes.map(([t, list]) => `${t} in ${list.join(", ")}`).join("; ")
+      : "No key dates");
+  }
 
-  // lighter fill for states with a key date in the next SOON_DAYS days (after today)
-  const SOON_DAYS = 10;
-  const soonDates = d3.range(1, SOON_DAYS + 1).map(k => fmtISO(d3.timeDay.offset(parse(TODAY), k)));
-  const soonStates = new Set(soonDates.flatMap(iso => [...dayInfo(iso).states]));
+  // on days with nothing today, half-yellow tiles for states with a key date in the next SOON_DAYS days
+  const soonWindow = days => {
+    const dates = d3.range(1, days + 1).map(k => fmtISO(d3.timeDay.offset(parse(TODAY), k)));
+    const states = new Set(dates.flatMap(iso => [...dayInfo(iso).states].filter(s => !todayStates.has(s))));
+    return { days, dates, states };
+  };
+  const soon = todayTypes.length ? { days: 5, dates: [], states: new Set() } : soonWindow(5);
+  const { days: SOON_DAYS, dates: soonDates, states: soonStates } = soon;
   state.classed("soon", d => soonStates.has(d.name) && !todayStates.has(d.name));
   if (soonStates.size) {
     const it = d3.select("#mapLegend").append("div").attr("class", "item");
     it.append("span").attr("class", "swatch soonState");
-    it.append("span").text(`States with a key date in the next ${SOON_DAYS} days (${short(soonDates[0])} – ${short(soonDates[SOON_DAYS - 1])})`);
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text("Up next: ");
+    const n = soonStates.size;
+    txt.append("span").text(`${n} state${n === 1 ? "" : "s"} with a key date in the next ${SOON_DAYS} days (${short(soonDates[0])} – ${short(soonDates[SOON_DAYS - 1])})`);
   }
 
   state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
