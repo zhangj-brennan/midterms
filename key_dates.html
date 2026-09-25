@@ -23,7 +23,7 @@
 
   #wrapper{
     width: 100%;
-    max-width: 800px;
+    max-width: 400px;
     margin: 0 auto;
   }
 
@@ -67,83 +67,21 @@
   #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
   #mapLegend .swatch.soonState{ background: linear-gradient(to bottom right, #DCDCDC 50%, #FFD200 50%); border: none; }
 
-  /* calendar section */
-  /* map and calendar sit side by side on wide screens, stacked otherwise */
-  #panels{
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 56px;
-    align-items: start;
-  }
-  .panel{ max-width: 400px; }
 
-  .section{
-    border-top: 3px solid black;
-    padding-top: 10px;
-  }
-  .sectionTitle{
-    font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 18px;
-    margin-bottom: 30px;
-  }
-  #calLegend, #mapLegend{
+  #mapLegend{
     display: flex;
     flex-wrap: wrap;
     gap: 4px 12px;
     font-size: 12px;
     margin-bottom: 24px;
   }
-  #calLegend .item, #mapLegend .item{ display: flex; align-items: center; gap: 5px; }
-  #calLegend .swatch, #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; }
-  #mapLegend .item{ align-items: flex-start; line-height: 1.35; }
-  #mapLegend .swatch{ flex: none; margin-top: 2px; }
+  #mapLegend .item{ display: flex; gap: 5px; align-items: flex-start; line-height: 1.35; }
+  #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; flex: none; margin-top: 2px; }
   #mapLegend .type{ font-family: "BentonStrong", system-ui, sans-serif; }
-  #calendar{
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px 20px;
-  }
-  .month h4{
-    font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 14px;
-    margin: 0 0 4px;
-  }
-  .days{
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 2px;
-  }
-  .dow{
-    font-size: 10px;
-    color: #777;
-    text-align: center;
-    padding-bottom: 2px;
-  }
-  .day{
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    color: #999;
-    background: #ffffff;
-  }
-  .day.empty{ background: none; }
-  .day.has{ color: #111; cursor: pointer; font-family: "BentonMedium", system-ui, sans-serif; }
-  .day.dark{ color: #fff; }
-  /* hovered day: yellow outline like the map */
-  .day.has:hover{ outline: 3px solid #FFD200; outline-offset: 1px; position: relative; z-index: 1; }
-  /* today's date, read from the viewer's clock on load */
-  .day.today{
-    background: #FFD200 !important;
-    font-family: "BentonStrong", system-ui, sans-serif;
-    color: #111;
-  }
-  #calLegend .swatch.today{ background: #FFD200; border: none; }
 
   #tooltip .stateList{ color: #111; }
 
-  /* hover popup with a state's full calendar */
+  /* hover popup with a state's key dates */
   #tooltip{
     position: fixed;
     pointer-events: none;
@@ -165,9 +103,7 @@
   #tooltip .electionName{ color: #555; margin-bottom: 6px; }
   #tooltip h3{
     font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .4px;
+    font-size: 12px;
     margin: 9px 0 3px;
     padding-bottom: 2px;
     border-bottom: 1px solid #ddd;
@@ -188,9 +124,6 @@
   #footer{ margin-top: 20px; font-size: 12px; color: #555; }
   #footer a{ color: #555; }
 
-  @media (max-width: 832px){
-    #panels{ grid-template-columns: 1fr; gap: 48px; }
-  }
   @media (max-width: 700px){
     body{ padding: 10px; }
   }
@@ -199,19 +132,11 @@
 
 <body>
 <div id="wrapper">
-  <div id="panels">
-    <div class="panel">
+  <div class="panel">
       <div id="title">2026 Midterm Election: By State</div>
       <div class="subtitle">Hover over a state to see its key dates.</div>
       <div id="mapLegend"></div>
       <div id="map"></div>
-    </div>
-
-    <div class="panel section">
-      <div class="sectionTitle">2026 Midterm Election: Key Dates</div>
-      <div id="calLegend"></div>
-      <div id="calendar"></div>
-    </div>
   </div>
 
   <div id="footer">
@@ -250,11 +175,22 @@ const CONFIG = {
 };
 /* ======================================================= */
 
-const fmtShort = d3.timeFormat("%b %-d");
-const fmtLong  = d3.timeFormat("%a, %b %-d");
+const fmtShort = d3.timeFormat("%B %-d");      // October 5
+const fmtLong  = d3.timeFormat("%A, %B %-d");  // Monday, October 5
 const parse    = d3.timeParse("%Y-%m-%d");
 const short = iso => fmtShort(parse(iso));
 const long  = iso => fmtLong(parse(iso));
+
+/* Spell out the source's abbreviated dates and weekdays: "Sun Oct 25" -> "Sunday, October 25",
+   "Oct 26th" -> "October 26". Weekdays attached to a date are recomputed from the 2026 date. */
+const MONTH_ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = { Sun: "Sunday", Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday" };
+function spellDates(t){
+  return t
+    .replace(/\b(?:(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*,?\s+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/g,
+      (m, wd, mon, day) => (wd ? fmtLong : fmtShort)(new Date(2026, MONTH_ABBRS.indexOf(mon), +day)))
+    .replace(/\b(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\b/g, w => WEEKDAYS[w]);
+}
 
 function parseStateGridText(gridText){
   const states = [];
@@ -312,7 +248,7 @@ function drawMap(){
   state.append("rect").attr("class", "tile")
     .attr("x", -tileSize/2).attr("y", -tileSize/2)
     .attr("width", tileSize).attr("height", tileSize);
-  // fill states that have a key date today (same "today" as the calendar ring)
+  // fill states that have a key date today
   const todayStates = dayInfo(TODAY).states;
   state.classed("today", d => todayStates.has(d.name));
   const todayTypes = todayByType(dayInfo(TODAY).evs, true);
@@ -359,9 +295,9 @@ function positionPopup(event){
   tip.style.top = y + "px";
 }
 
-// on touch screens there is no mouseleave, so a tap anywhere but a state or a dated day closes the popup
+// on touch screens there is no mouseleave, so a tap anywhere but a state closes the popup
 document.addEventListener("pointerdown", e => {
-  if (!e.target.closest(".state, .day.has")) d3.select("#tooltip").style("display", "none");
+  if (!e.target.closest(".state")) d3.select("#tooltip").style("display", "none");
 });
 
 /* ---------- popup ---------- */
@@ -369,7 +305,7 @@ function renderPopup(abbr){
   const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", true);
   const s = STATE_DATES[abbr];
   panel.append("h2").text(s.name);
-  panel.append("div").attr("class", "electionName").text(s.election + " · " + long(ELECTION_DAY));
+  panel.append("div").attr("class", "electionName").text(s.election + " — " + long(ELECTION_DAY));
 
   const { dated, undated } = stateKeyDates(s);
   const byDate = d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b));
@@ -399,7 +335,7 @@ function renderPopup(abbr){
     undated.forEach(e => addKeyDate(ul, e));
   }
 
-  if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(s.note);
+  if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(spellDates(s.note));
 }
 
 /* One state's deadlines as { date, what, how, time, note } rows; ranges become a start row and an end row. */
@@ -450,22 +386,11 @@ function addKeyDate(ul, e){
   const li = ul.append("li");
   li.append("span").attr("class", "what").text(e.what);
   const bits = [e.how, e.text].filter(Boolean);
-  if (bits.length) li.append("span").attr("class", "how").text(" · " + bits.join(", "));
-  if (e.note) li.append("span").attr("class", "note").text(e.note);
+  if (bits.length) li.append("span").attr("class", "how").text(" — " + spellDates(bits.join(", ")));
+  if (e.note) li.append("span").attr("class", "note").text(spellDates(e.note));
 }
 
-/* ---------- calendar ---------- */
-const MONTHS = [8, 9, 10]; // Sep–Nov (0-based months), 2026
-
-// Days shaded by how many states have a key date that day; Election Day stands apart.
-const CAL_BINS = [
-  { label: "1–2 states",  min: 1,  fill: "#E4E4E4" },
-  { label: "3–5",         min: 3,  fill: "#B8B8B8" },
-  { label: "6–10",        min: 6,  fill: "#7A7A7A", dark: true },
-  { label: "11 or more",  min: 11, fill: "#3A3A3A", dark: true }
-];
-const ELECTION_FILL = "#111";
-
+/* ---------- key-date events (drive the map's today / up-next shading) ---------- */
 // Event types, in the order they appear in the popup
 const EVENT_TYPES = [
   "Election Day",
@@ -513,87 +438,12 @@ function buildEvents(){
 
 const EVENTS_BY_DATE = d3.group(buildEvents(), d => d.date);
 const fmtISO = d3.timeFormat("%Y-%m-%d");
-const fmtDay = d3.timeFormat("%A, %B %-d");
 
 function dayInfo(iso){
   const evs = EVENTS_BY_DATE.get(iso) || [];
-  // Election Day itself doesn't count toward the shading
+  // Election Day itself doesn't count
   const states = new Set(evs.filter(e => e.type !== "Election Day").map(e => e.state));
   return { evs, states, n: states.size };
-}
-
-function dayStyle(iso, n){
-  if (iso === ELECTION_DAY) return { fill: ELECTION_FILL, dark: true };
-  if (!n) return null;
-  return CAL_BINS.filter(b => n >= b.min).pop();
-}
-
-function drawCalendar(){
-  const legend = d3.select("#calLegend");
-  const items = [{ label: "Election Day", fill: ELECTION_FILL }];
-  if (TODAY >= "2026-09-01" && TODAY <= "2026-11-30") items.push({ label: `Today (${long(TODAY)})`, today: true });
-  const it = legend.selectAll(".item").data(items).join("div").attr("class", "item");
-  it.append("span").attr("class", "swatch").classed("today", d => d.today).style("background", d => d.fill);
-  it.append("span").text(d => d.label);
-
-  const months = d3.select("#calendar").selectAll(".month")
-    .data(MONTHS)
-    .join("div")
-    .attr("class", "month");
-
-  months.append("h4").text(m => d3.timeFormat("%B")(new Date(2026, m, 1)));
-
-  const grid = months.append("div").attr("class", "days");
-  grid.selectAll(".dow").data(["S", "M", "T", "W", "T", "F", "S"]).join("div").attr("class", "dow").text(d => d);
-
-  grid.each(function(m){
-    const first = new Date(2026, m, 1);
-    const cells = d3.range(first.getDay()).map(() => ({ empty: true }))
-      .concat(d3.timeDays(first, new Date(2026, m + 1, 1)).map(date => {
-        const iso = fmtISO(date);
-        return { date, iso, ...dayInfo(iso) };
-      }));
-
-    d3.select(this).selectAll(".day")
-      .data(cells)
-      .join("div")
-      .attr("class", "day")
-      .classed("empty", d => d.empty)
-      .classed("has", d => !d.empty && d.evs.length > 0)
-      .classed("today", d => d.iso === TODAY)
-      .each(function(d){
-        if (d.empty) return;
-        const st = dayStyle(d.iso, d.n);
-        d3.select(this)
-          .text(d.date.getDate())
-          .classed("dark", !!(st && st.dark))
-          .style("background", st ? st.fill : null);
-      })
-      .filter(d => !d.empty && d.evs.length)
-      .on("mouseenter", (e, d) => {
-        renderDayPopup(d);
-        positionPopup(e);
-      })
-      .on("mousemove", positionPopup)
-      .on("mouseleave", () => {
-        d3.select("#tooltip").style("display", "none");
-      });
-  });
-}
-
-function renderDayPopup(d){
-  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", false);
-  panel.append("h2").text(fmtDay(d.date));
-  panel.append("div").attr("class", "electionName").text(
-    d.iso === ELECTION_DAY ? "General election in every state" :
-    `Key dates in ${d.n} state${d.n === 1 ? "" : "s"}`
-  );
-
-  todayByType(d.evs, true).forEach(([t, list]) => {
-    const h = panel.append("h3").text(t + " ");
-    h.append("span").attr("class", "count").text(`(${list.length} state${list.length === 1 ? "" : "s"})`);
-    panel.append("div").attr("class", "stateList").text(list.join(", "));
-  });
 }
 
 /* A day's events as [type, state labels] pairs in EVENT_TYPES order, Election Day left out.
@@ -610,7 +460,6 @@ function todayByType(evs, fullNames){
 }
 
 drawMap();
-drawCalendar();
 </script>
 </body>
 </html>
