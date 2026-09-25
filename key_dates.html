@@ -122,7 +122,9 @@
   #tooltip .note{ color: #777; font-size: 11px; display: block; }
 
   #footer{ margin-top: 20px; font-size: 12px; color: #555; }
-  #footer a{ color: #555; }
+  #footer a{ color: #007194; text-decoration: none; }
+  #footer a:hover{ text-decoration: underline; }
+  #footer .label{ font-family: "BentonStrong", system-ui, sans-serif; color: #111; }
 
   @media (max-width: 700px){
     body{ padding: 10px; }
@@ -133,16 +135,16 @@
 <body>
 <div id="wrapper">
   <div class="panel">
-      <div id="title">2026 Midterm Election: By State</div>
+      <div id="title">Key 2026 Election Dates By State</div>
       <div class="subtitle">Hover over a state to see its key dates.</div>
       <div id="mapLegend"></div>
       <div id="map"></div>
   </div>
 
   <div id="footer">
-    Sources: <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a>
+    <span class="label">Source:</span> <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a>
     (deadlines for domestic voters) and <a href="https://www.vote411.org/" target="_blank">VOTE411</a>
-    (registration deadlines by method). Data collected September 24, 2026. Confirm with your state or local election office.
+    (registration deadlines by method). Data collected September 24, 2026.
   </div>
 </div>
 
