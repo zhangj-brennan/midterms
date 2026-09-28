@@ -6,6 +6,7 @@
 <title>Midterm Key Dates by State</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="load_state_dates.js"></script>
+<script src="map_logic.js"></script>
 <style>
   @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
   @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
@@ -145,8 +146,7 @@
 
   <div id="footer">
     <span class="label">Source:</span> <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a>
-    (deadlines for domestic voters) and <a href="https://www.vote411.org/" target="_blank">VOTE411</a>
-    (registration deadlines by method). Data collected September 24, 2026.
+    and <a href="https://www.vote411.org/" target="_blank">VOTE411</a>. Data collected September 24, 2026.
   </div>
 </div>
 
@@ -170,9 +170,10 @@ HI AK    TX             FL
 ========================================================= */
 /* Data flow, CSV -> map:
      1. loadStateDates() (load_state_dates.js) turns CSV rows into one record per state.
-     2. stateKeyDates()  turns a state's record into the lines of its hover popup (nearly every row).
-     3. buildEvents()    turns every state's record into one-date-per-type events; the tile shading
-                         and the "Today" / "Up next" legend come only from these.
+     2. stateKeyDates()  (map_logic.js) turns a state's record into the lines of its hover popup (nearly every row).
+     3. buildEvents()    (map_logic.js) turns every state's record into one-date-per-type events; the tile
+                         shading and the "Today" / "Up next" legend come only from these.
+   mapcheck.html runs the same map_logic.js on the same CSV and lists the result next to each CSV row.
    So a date can be in the CSV and in the popup but not drive the shading (see buildEvents for the rules). */
 // key dates by state, from state_dates_2026.csv (module script, so top-level await works)
 const STATE_DATES = await loadStateDates();
@@ -327,7 +328,7 @@ function renderPopup(abbr){
   panel.append("h2").text(s.name);
   panel.append("div").attr("class", "electionName").text(s.election + " — " + long(ELECTION_DAY));
 
-  const { dated, undated } = stateKeyDates(s);
+  const { dated, undated } = stateKeyDates(s, ELECTION_DAY);
   const byDate = d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b));
   const next = (byDate.find(([date]) => date >= TODAY) || [])[0];
   byDate.forEach(([date, evs]) => {
@@ -358,69 +359,7 @@ function renderPopup(abbr){
   if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(spellDates(s.note));
 }
 
-/* ---------- popup parsing: CSV rows -> the lines in a state's popup ----------
-   One state's deadlines as { date, what, how, time, note } rows; ranges become a start row and an end row.
-   `dated` rows are grouped under date headings; `undated` rows go under "Other".
-
-   Which CSV rows show up, and as what:
-     Voter registration by method (VOTE411)  -> "Registration deadline — online, by mail (postmarked), …"
-                                                (methods that share a date are merged into one line)
-     Voter registration (U.S. Vote / state)  -> ONLY labels containing "Same Day" or "Election Day":
-                                                a range becomes "Same-day registration begins/ends",
-                                                a single date becomes "Election Day registration".
-                                                All other U.S. Vote registration rows ("Received by",
-                                                "Postmarked by", "In-Person, Received by", …) are NOT shown;
-                                                VOTE411's by-method dates are used instead.
-     Mail ballot request                     -> single date: "Mail ballot request deadline — <label>"
-                                                range: "<Label> begins/ends" (e.g. "Emergency ballot period")
-     Mail ballot return                      -> "Mail ballots due — <label>" (every row)
-     Early voting                            -> range: "<Label> begins/ends"; no dates: listed under "Other"
-     (always)                                -> "Election Day" on Nov 3
-   The row's label becomes the "how" text after " — " with a trailing " by" dropped; times are
-   shortened ("5:00PM" -> "5pm"); abbreviated dates in labels/notes are spelled out by spellDates(). */
-function stateKeyDates(s){
-  const dated = [], undated = [];
-  const how = i => i.label ? i.label.replace(/\s+by$/i, "") : "";
-  const sentence = t => t.charAt(0) + t.slice(1).toLowerCase(); // "Early Voting" -> "Early voting"
-  const push = (date, what, i = {}, extra = {}) => (date ? dated : undated).push({
-    date, what,
-    how: how(i), time: i.time, note: i.note, text: date ? null : i.text, ...extra
-  });
-
-  // registration deadlines by method, merged when methods share a date
-  const r = s.registrationByMethod;
-  const methods = [["online", "online"], ["mail", "by mail"], ["inPerson", "in person"]]
-    .filter(([k]) => r[k])
-    .map(([k, lab]) => ({ date: r[k].date, lab: lab + (r[k].qualifier ? ` (${r[k].qualifier})` : "") }));
-  if (!methods.length) undated.push({ what: "No voter registration required" });
-  d3.groups(methods, m => m.date).forEach(([date, ms]) =>
-    push(date, "Registration deadline", {}, { how: ms.map(m => m.lab).join(", ") }));
-  // same-day / election-day registration windows from U.S. Vote
-  (s.registration || []).filter(i => /Same Day|Election Day/i.test(i.label)).forEach(i => {
-    if (i.start) {
-      push(i.start, "Same-day registration begins", {}, { note: i.note });
-      if (i.end) push(i.end, "Same-day registration ends");
-    } else push(i.date, "Election Day registration", {}, { time: i.time, note: i.note });
-  });
-
-  (s.mailRequest || []).forEach(i => {
-    if (i.start) {
-      push(i.start, `${sentence(how(i))} begins`, {}, { note: i.note });
-      if (i.end) push(i.end, `${sentence(how(i))} ends`);
-    } else push(i.date, "Mail ballot request deadline", i);
-  });
-  (s.mailReturn || []).forEach(i => push(i.date, "Mail ballots due", i));
-  (s.earlyVoting || []).forEach(i => {
-    const what = sentence(i.label || "Early voting");
-    if (i.start) {
-      push(i.start, `${what} begins`, {}, { note: i.note });
-      if (i.end) push(i.end, `${what} ends`);
-    } else push(null, what, i, { how: "" });
-  });
-  push(ELECTION_DAY, "Election Day");
-  return { dated, undated };
-}
-
+/* stateKeyDates() — which CSV rows become which popup lines — is in map_logic.js. */
 function addKeyDate(ul, e){
   const li = ul.append("li");
   li.append("span").attr("class", "what").text(e.what);
@@ -429,70 +368,9 @@ function addKeyDate(ul, e){
   if (e.note) li.append("span").attr("class", "note").text(spellDates(e.note));
 }
 
-/* ---------- key-date events (drive the map's today / up-next shading) ---------- */
-// Event types, in the order they appear in the popup
-const EVENT_TYPES = [
-  "Election Day",
-  "Registration deadline",
-  "Mail ballot request deadline",
-  "Early voting begins",
-  "Early voting ends",
-  "Mail ballots due",
-  "Mail ballots due if postmarked by Election Day"
-];
-
-/* ---------- map parsing: CSV rows -> the events behind the tile shading and legend ----------
-   Flatten every state's record into { date, type, state, detail } events. Unlike the popup, this
-   picks AT MOST ONE date per state per event type, so a state with several deadlines of one kind
-   is represented by a single date here (the rule for each type is noted below). The "Today" and
-   "Up next" legend lines and the yellow / half-yellow tiles are all built from these events. */
-function buildEvents(){
-  const events = [];
-  const add = (date, type, state, detail) => date && events.push({ date, type, state, detail });  // rows without a date are skipped
-
-  Object.entries(STATE_DATES).forEach(([abbr, s]) => {
-    // Registration deadline: from VOTE411's by-method dates only (U.S. Vote registration rows are
-    // not used). Methods closing on the same date become one event whose detail lists them
-    // ("online, mail"); dates equal to Election Day are left out, since those are same-day
-    // registration rather than a deadline to act on beforehand.
-    const byDate = d3.group(
-      [["online", "online"], ["mail", "mail"], ["inPerson", "in person"]]
-        .filter(([k]) => s.registrationByMethod[k] && s.registrationByMethod[k].date !== ELECTION_DAY)
-        .map(([k, lab]) => ({ date: s.registrationByMethod[k].date, lab })),
-      d => d.date
-    );
-    byDate.forEach((rows, date) => add(date, "Registration deadline", abbr, rows.map(r => r.lab).join(", ")));
-
-    // Mail ballot request deadline: the state's FIRST mail-request row (in CSV order) that has a
-    // single date. Rows with a date range (e.g. emergency ballot periods) are skipped.
-    const req = (s.mailRequest || []).find(i => i.date);
-    if (req) add(req.date, "Mail ballot request deadline", abbr);
-
-    // Early voting begins / ends: the EARLIEST start and the LATEST end across all early-voting rows
-    // (a state can list several windows, e.g. early voting and in-person absentee voting).
-    const starts = (s.earlyVoting || []).filter(i => i.start).map(i => i.start).sort();
-    const ends = (s.earlyVoting || []).filter(i => i.end).map(i => i.end).sort();
-    if (starts.length) add(starts[0], "Early voting begins", abbr);
-    if (ends.length) add(ends[ends.length - 1], "Early voting ends", abbr);
-
-    // Mail ballots due: two event types.
-    //   "…if postmarked by Election Day": the FIRST return row whose label contains "Postmarked".
-    //   "Mail ballots due": the LATEST date among all the other return rows (received / hand-delivered /
-    //   drop box).
-    const returns = (s.mailReturn || []).filter(i => i.date);
-    const post = returns.find(i => /Postmarked/i.test(i.label));
-    if (post) add(post.date, "Mail ballots due if postmarked by Election Day", abbr);
-    const received = returns.filter(i => i !== post).map(i => i.date).sort();
-    if (received.length) add(received[received.length - 1], "Mail ballots due", abbr);
-
-    // Election Day for every state (left out of the shading and legend; see eventsOn in drawMap).
-    add(ELECTION_DAY, "Election Day", abbr);
-  });
-  return events;
-}
-
+/* EVENT_TYPES and buildEvents() — the one-date-per-type events behind the shading — are in map_logic.js. */
 // events indexed by ISO date ("2026-10-05" -> [events]) for the today / up-next lookups
-const EVENTS_BY_DATE = d3.group(buildEvents(), d => d.date);
+const EVENTS_BY_DATE = d3.group(buildEvents(STATE_DATES, ELECTION_DAY), d => d.date);
 const fmtISO = d3.timeFormat("%Y-%m-%d");
 
 function dayInfo(iso){

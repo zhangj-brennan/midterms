@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Map vs. Data Check</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="load_state_dates.js"></script>
+<script src="map_logic.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, sans-serif;
+  }
+  b, strong{ font-family: "BentonStrong", system-ui, sans-serif; font-weight: normal; }
+  #testBanner{
+    background: #C8102E;
+    color: #fff;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 6px 16px;
+    margin: -16px -16px 16px;
+  }
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    border-top: 3px solid #111;
+  }
+  .intro{ font-size: 13px; color: #333; max-width: 1000px; line-height: 1.45; }
+  .intro ul{ margin: 6px 0 10px; padding-left: 20px; }
+  .intro li{ margin-bottom: 3px; }
+  a{ color: #007194; text-decoration: none; }
+  a:hover{ text-decoration: underline; }
+
+  #summary{ font-size: 13px; margin: 14px 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  #summary .key{ display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; border: 1px solid #ccc; }
+  #stateNav{ font-size: 12px; margin-bottom: 18px; line-height: 1.9; }
+  #stateNav a{ margin-right: 8px; }
+
+  section.state{ border-top: 2px solid #111; padding-top: 8px; margin-bottom: 26px; }
+  section.state h2{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 17px; margin: 0 0 8px; }
+  section.state h3{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 13px; margin: 12px 0 4px; }
+  .sub{ font-family: "Benton", system-ui, sans-serif; color: #555; font-size: 12px; }
+
+  table{ border-collapse: collapse; font-size: 12px; width: 100%; max-width: 1400px; }
+  th{ font-family: "BentonStrong", system-ui, sans-serif; text-align: left; border-bottom: 1px solid #111; padding: 4px 8px; white-space: nowrap; }
+  td{ padding: 4px 8px; border-bottom: 1px solid #e3e3e3; vertical-align: top; }
+  td.nowrap{ white-space: nowrap; }
+  td.line{ color: #555; white-space: nowrap; }
+  .srcRow{ display: block; }
+  .srcRow .ln{ color: #555; }
+  .srcText{ color: #555; }
+
+  /* how the map uses each CSV row */
+  tr.shading td{ background: #EEF6EE; }
+  tr.popupOnly td{ background: #fff; }
+  tr.unused td{ background: #FFF1E0; }
+  .key.shading{ background: #EEF6EE; }
+  .key.popupOnly{ background: #fff; }
+  .key.unused{ background: #FFF1E0; }
+</style>
+</head>
+<body>
+<div id="testBanner">FOR INTERNAL TESTING ONLY</div>
+<div id="title">Map vs. Data Check</div>
+<div class="intro">
+  <p>For each state: exactly what the <a href="map.html">map</a> does with each row of
+    <a href="data.html">the data</a>. This page runs the map's own code (<code>map_logic.js</code>) on the same
+    CSV, so it can't drift from the map. Line numbers are lines in <code>state_dates_2026.csv</code>.</p>
+  <p>The map uses the data in two ways:</p>
+  <ul>
+    <li><b>Tile shading and the "Today" / "Up next" legend</b> use at most <b>one date per state per deadline type</b>:
+      registration deadlines from VOTE411 (Election Day dates left out); the <b>first</b> dated mail ballot request row;
+      the <b>earliest</b> early voting start and <b>latest</b> end; the <b>latest</b> non-postmark ballot return date; and the first
+      "Postmarked" return row.</li>
+    <li><b>The hover popup</b> shows nearly every row, except U.S. Vote Foundation registration rows other than
+      same-day / Election Day registration (VOTE411's by-method dates are shown instead).</li>
+  </ul>
+</div>
+
+<div id="summary"></div>
+<div id="stateNav"></div>
+<div id="states"></div>
+
+<script>
+const ELECTION_DAY = "2026-11-03";
+const fmtRange = r => r.date || (r.start_date ? `${r.start_date} – ${r.end_date}` : "");
+
+loadStateDates().then(STATE_DATES => {
+  const events = buildEvents(STATE_DATES, ELECTION_DAY).filter(e => e.type !== "Election Day");
+
+  // every CSV row (other than official-source links), in file order, with how the map uses it
+  const byLine = new Map();
+  const note = (row, key, text) => {
+    if (!row) return;
+    const u = byLine.get(row.line) || byLine.set(row.line, { row, shading: [], popup: [] }).get(row.line);
+    u[key].push(text);
+  };
+  Object.values(STATE_DATES).forEach(s => {
+    ["registration", "mailRequest", "mailReturn", "earlyVoting"].forEach(k => s[k].forEach(i => note(i.csv, "shading", null)));
+    Object.values(s.registrationByMethod).forEach(m => note(m.csv, "shading", null));
+    note(s.electionCsv, "popup", "Popup heading (election name)");
+    note(s.noteCsv, "popup", "Popup note (bottom)");
+    note(s.noRegistrationCsv, "shading", null);
+    const { dated, undated } = stateKeyDates(s, ELECTION_DAY);
+    dated.concat(undated).forEach(p => p.src.forEach(row =>
+      note(row, "popup", `${p.what}${p.date ? ` (${p.date})` : " (under “Other”)"}`)));
+  });
+  byLine.forEach(u => { u.shading = u.shading.filter(Boolean); });
+  events.forEach(e => e.src.forEach(row => byLine.get(row.line).shading.push(`${e.type} (${e.date})`)));
+  const status = u => u.shading.length ? "shading" : u.popup.length ? "popupOnly" : "unused";
+
+  // summary
+  const all = [...byLine.values()];
+  const count = st => all.filter(u => status(u) === st).length;
+  d3.select("#summary").html(
+    `<span><b>${all.length}</b> CSV rows</span>` +
+    `<span><span class="key shading"></span><b>${count("shading")}</b> drive tile shading and the legend (and show in the popup)</span>` +
+    `<span><span class="key popupOnly"></span><b>${count("popupOnly")}</b> show in the popup only</span>` +
+    `<span><span class="key unused"></span><b>${count("unused")}</b> not used by the map</span>`);
+
+  const states = Object.entries(STATE_DATES).sort(([, a], [, b]) => a.name.localeCompare(b.name));
+  d3.select("#stateNav").selectAll("a").data(states).join("a")
+    .attr("href", ([abbr]) => `#${abbr}`).text(([abbr]) => abbr);
+
+  const sec = d3.select("#states").selectAll("section").data(states).join("section")
+    .attr("class", "state").attr("id", ([abbr]) => abbr);
+  sec.append("h2").text(([, s]) => s.name);
+
+  // 1. the events behind this state's shading
+  sec.append("h3").html(`What the map shades <span class="sub">— one date per deadline type</span>`);
+  sec.append("table").each(function([abbr]){
+    const t = d3.select(this);
+    t.append("thead").append("tr").selectAll("th").data(["Deadline type", "Date", "Detail", "From CSV row"]).join("th").text(d => d);
+    const evs = events.filter(e => e.state === abbr)
+      .sort((a, b) => d3.ascending(EVENT_TYPES.indexOf(a.type), EVENT_TYPES.indexOf(b.type)) || d3.ascending(a.date, b.date));
+    const tr = t.append("tbody").selectAll("tr").data(evs.length ? evs : [null]).join("tr");
+    tr.filter(e => !e).append("td").attr("colspan", 4).text("No shading events for this state.");
+    const ev = tr.filter(e => e);
+    ev.append("td").text(e => e.type);
+    ev.append("td").attr("class", "nowrap").text(e => e.date);
+    ev.append("td").text(e => e.detail || "");
+    ev.append("td").each(function(e){
+      e.src.forEach(r => {
+        const s = d3.select(this).append("span").attr("class", "srcRow");
+        s.append("span").attr("class", "ln").text(`Line ${r.line}: `);
+        s.append("span").text(`${r.category} › ${r.label || "(no label)"} `);
+        s.append("span").attr("class", "srcText").text(r.source_text ? `“${r.source_text}” ` : "");
+        s.append("span").attr("class", "srcText").text(`[${r.source}]`);
+      });
+    });
+  });
+
+  // 2. every CSV row for this state and how the map uses it
+  sec.append("h3").html(`Every CSV row <span class="sub">— green: drives shading · white: popup only · orange: not used</span>`);
+  sec.append("table").each(function([abbr]){
+    const t = d3.select(this);
+    t.append("thead").append("tr").selectAll("th")
+      .data(["Line", "Category", "Label", "Date", "Source text", "Source", "Map shading / legend", "Popup"]).join("th").text(d => d);
+    const rows = all.filter(u => u.row.state === abbr).sort((a, b) => a.row.line - b.row.line);
+    const tr = t.append("tbody").selectAll("tr").data(rows).join("tr").attr("class", status);
+    tr.append("td").attr("class", "line").text(u => u.row.line);
+    tr.append("td").text(u => u.row.category);
+    tr.append("td").text(u => u.row.label);
+    tr.append("td").attr("class", "nowrap").text(u => fmtRange(u.row));
+    tr.append("td").text(u => u.row.category === "State note" ? u.row.note : u.row.source_text);
+    tr.append("td").attr("class", "nowrap").text(u => u.row.source);
+    tr.append("td").text(u => u.shading.join("; ") || "—");
+    tr.append("td").text(u => u.popup.join("; ") || "—");
+  });
+});
+</script>
+</body>
+</html>

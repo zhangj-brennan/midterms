@@ -5,7 +5,9 @@
 // loadStateDates() resolves to STATE_DATES, keyed by state abbreviation:
 //   { name, election, registration: [], mailRequest: [], mailReturn: [], earlyVoting: [], note,
 //     registrationByMethod: { online, mail, inPerson }, usvoteUrl, vote411Url, officialSources: [{ label, url }] }
-// Deadline items are { label, text, note, date, time, start, end }, with empty CSV cells left out.
+// Deadline items are { label, text, note, date, time, start, end, csv }, with empty CSV cells left out.
+// Every item keeps `csv`, the raw CSV row it came from (with `line`, its line number in the file), so
+// mapcheck.html can trace each date on the map back to its row. The map itself never reads `csv`.
 
 const CSV_CATEGORY_KEYS = {
   "Voter registration": "registration",
@@ -16,12 +18,13 @@ const CSV_CATEGORY_KEYS = {
 const CSV_METHOD_KEYS = { "Online": "online", "By mail": "mail", "In person": "inPerson" };
 
 /* Parsing, one CSV row at a time. Rows keep their CSV order within each list, which matters
-   downstream (e.g. the map uses a state's FIRST dated mail-request row; see buildEvents in map.html).
+   downstream (e.g. the map uses a state's FIRST dated mail-request row; see buildEvents in map_logic.js).
    Columns the map never reads: source_text for non-deadline rows, conflict_note, checked_by_jia. */
 function loadStateDates(){
   return d3.csv("state_dates_2026.csv").then(rows => {
     const out = {};
-    rows.forEach(r => {
+    rows.forEach((r, idx) => {
+      r.line = idx + 2;  // line 1 is the header
       // 1. Start the state's record the first time its abbreviation appears.
       const s = out[r.state] ||= {
         name: r.state_name, election: "",
@@ -35,23 +38,23 @@ function loadStateDates(){
       // 3. Route the row by its category.
       if (r.category === "Official source") (s.officialSources ||= []).push({ label: r.label, url: r.source_url });
       // "Election" row: its label is the election's full name, shown under the state name in the popup.
-      else if (r.category === "Election") s.election = r.label;
+      else if (r.category === "Election") { s.election = r.label; s.electionCsv = r; }
       // "State note": one sentence shown at the bottom of the popup.
-      else if (r.category === "State note") s.note = r.note;
+      else if (r.category === "State note") { s.note = r.note; s.noteCsv = r; }
       // VOTE411 rows: one registration deadline per method. These are the ONLY registration
       // deadlines the map shades and the popup's "Registration deadline" lines use.
       else if (r.category === "Voter registration by method") {
-        if (r.label === "No registration required") return;  // e.g. North Dakota: leave registrationByMethod empty
+        if (r.label === "No registration required") { s.noRegistrationCsv = r; return; }  // e.g. North Dakota: leave registrationByMethod empty
         // label is "<Method>" or "<Method> (<qualifier>)": "By mail (postmarked)" -> mail: { date, qualifier: "postmarked" }
         const [, method, qualifier] = r.label.match(/^(.*?)(?: \((.*)\))?$/);
-        s.registrationByMethod[CSV_METHOD_KEYS[method]] = qualifier ? { date: r.date, qualifier } : { date: r.date };
+        s.registrationByMethod[CSV_METHOD_KEYS[method]] = qualifier ? { date: r.date, qualifier, csv: r } : { date: r.date, csv: r };
       } else {
         // 4. Everything else is a deadline row (U.S. Vote Foundation, or a state's own source such as
         //    Connecticut's and Nevada's Election Day registration rows). It goes into the list for its
         //    category, keeping only the cells that are filled in:
         //    label -> label, source_text -> text, note, date, time, start_date -> start, end_date -> end.
         //    A category missing from CSV_CATEGORY_KEYS would throw here, so new categories must be added above.
-        const item = { label: r.label, text: r.source_text };
+        const item = { label: r.label, text: r.source_text, csv: r };
         [["note", r.note], ["date", r.date], ["time", r.time], ["start", r.start_date], ["end", r.end_date]]
           .forEach(([k, v]) => { if (v) item[k] = v; });
         s[CSV_CATEGORY_KEYS[r.category]].push(item);
