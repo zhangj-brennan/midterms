@@ -394,6 +394,20 @@ function todayByType(evs, fullNames){
 }
 
 drawMap();
+
+/* When embedded in an iframe, tell the parent page how tall the content is, so the embed snippet
+   (README-embedding.md) can size the iframe to fit. The height changes day to day with the length of
+   the "Today" / "Up next" legend, and after web fonts load, so re-send it whenever the content resizes. */
+if (window.parent !== window) {
+  const wrapper = document.getElementById("wrapper");
+  const sendHeight = () => {
+    const bottom = wrapper.getBoundingClientRect().bottom + window.scrollY;
+    const height = Math.ceil(bottom + parseFloat(getComputedStyle(document.body).paddingBottom));
+    window.parent.postMessage({ type: "keydates-map-height", height }, "*");
+  };
+  new ResizeObserver(sendHeight).observe(wrapper);
+  window.addEventListener("load", sendHeight);
+}
 </script>
 </body>
 </html>
