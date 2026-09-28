@@ -38,6 +38,8 @@
   }
   td{ padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
   td.nowrap{ white-space: nowrap; } /* dates and times stay on one line */
+  td.conflict{ min-width: 180px; }
+  tr:not(.stateHead) td.conflict:not(:empty){ background: #FFF1E0; }
   td.where{ min-width: 180px; color: #555; }
   td.source{ min-width: 200px; }
   td.source .sourceName{ display: block; color: #555; }
@@ -61,6 +63,20 @@
     font-size: 13px;
   }
   #download:hover{ background: #FFD200; text-decoration: none; }
+  /* source conflicts summary, above the main table */
+  #conflicts{ border: 1px solid #111; background: #FFF1E0; padding: 12px 14px; margin-bottom: 20px; max-width: 1100px; }
+  #conflicts h2{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 15px; margin: 0 0 4px; }
+  #conflicts .intro{ font-size: 13px; color: #555; margin: 0 0 10px; }
+  #conflicts table{ font-size: 12px; }
+  #conflicts th{ position: static; background: none; border-bottom: 1px solid #111; }
+  #conflicts td{ border-bottom: 1px solid #E8CFB0; background: none; }
+  #conflicts tr:hover td{ background: none; }
+  #conflicts b{ font-family: "BentonStrong", system-ui, sans-serif; font-weight: normal; }
+  #conflicts td.st{ font-family: "BentonStrong", system-ui, sans-serif; white-space: nowrap; }
+  #checkStatus{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 13px; margin-bottom: 10px; }
+  /* hand-check column */
+  td.check{ white-space: nowrap; color: #2E6B2E; font-family: "BentonStrong", system-ui, sans-serif; }
+  tr.checked td{ background: #EEF6EE; }
   /* internal-only warning bar */
   #testBanner{
     background: #C8102E;
@@ -79,6 +95,38 @@
 <div id="title">Key 2026 Election Dates: Source Data</div>
 <div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it; "Where on the source page" says where the row's text appears. Notes from U.S. Vote Foundation are in tooltips: hover the (!) icon next to the deadline to see them. Each state starts with a link to its official state election site, from <a href="https://www.usa.gov/state-election-office" target="_blank">USA.gov</a>.</div>
 
+<div id="conflicts">
+  <h2>Conflicts between VOTE411 and U.S. Vote Foundation</h2>
+  <p class="intro">The two sources overlap only on voter registration deadlines. They agree on all but these three states, each resolved with the state's own official source.</p>
+  <table>
+    <thead><tr><th>State</th><th>VOTE411</th><th>U.S. Vote Foundation</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="st">Connecticut</td>
+        <td>In person through <b>Nov 3</b></td>
+        <td>In person by <b>Nov 2, noon</b>; same-day registration only <b>Oct 19–Nov 1</b> (early voting); no Election Day registration listed</td>
+        <td><b>Nov 3.</b> “On Election Day, if you are not registered but want to vote, you can register in person at your town’s same-day registration site.”<br>
+          <a href="https://portal.ct.gov/-/media/sots/education/early-voting/2026_ev-ab/2026_ev-ab_information_final_web.pdf?rev=1e6bed800f034486b883539bfa32c950&amp;hash=C0A7F58B273B8D334835E9559344C08F" target="_blank">Connecticut Secretary of the State: 2026 Early Voting &amp; Absentee Voting information (PDF)</a></td>
+      </tr>
+      <tr>
+        <td class="st">Nevada</td>
+        <td>In person through <b>Nov 3</b></td>
+        <td>In person by <b>Oct 6</b>; same-day registration only <b>Oct 17–30</b> (early voting); no Election Day registration listed</td>
+        <td><b>Nov 3.</b> Same-day registration is available in person at a polling place during early voting or on Election Day (also NRS 293.5847(1)).<br>
+          <a href="https://www.nvsos.gov/elections/election-information/same-day-registration" target="_blank">Nevada Secretary of State: Same-day registration</a></td>
+      </tr>
+      <tr>
+        <td class="st">Vermont</td>
+        <td>Online and by mail through <b>Nov 3</b></td>
+        <td>Online and mail “Submitted by” <b>Nov 2, 5pm</b>; Election Day registration <b>Nov 3</b> listed separately (in person)</td>
+        <td><b>Nov 3.</b> “Beginning January 1, 2017, eligible persons may register to vote on any day up to and including the day of the election.” (17 V.S.A. § 2144)<br>
+          <a href="https://sos.vermont.gov/elections/voters/registration" target="_blank">Vermont Secretary of State: Voter Registration</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div id="checkStatus"></div>
 <div id="tableWrap"><table><thead></thead><tbody></tbody></table></div>
 
 <a id="download" href="state_dates_2026.csv" download>Download CSV</a>
@@ -95,8 +143,10 @@ const COLUMNS = [
   ["Time",        r => r.time, "nowrap"],
   ["Source text", r => r.source_text],
   ["Note",        r => r.note],
+  ["Conflict / resolution", r => r.conflict_note, "conflict"],
   ["Where on the source page", r => whereOnPage(r), "where"],
-  ["Source",      null, "source"]
+  ["Source",      null, "source"],
+  ["Hand-checked by Jia", r => r.checked_by_jia ? `✓ ${r.checked_by_jia}` : "", "check"]
 ];
 
 // U.S. Vote Foundation section heading for each CSV category
@@ -123,17 +173,19 @@ function whereOnPage(r){
     const onPage = r.label.replace(/^By mail/, "By Mail").replace(/^In person/, "In Person");
     return `"Upcoming Election Dates & Registration Deadlines" → "Registration Deadlines" → "${onPage}"`;
   }
+  // other sources (e.g. a state's own PDF): the "Source text" column is quoted from the page
+  if (r.source_text) return `Search the ${/\.pdf(\?|$)/i.test(r.source_url) ? "PDF" : "page"} for the "Source text" wording`;
   return "";
 }
 
 d3.csv("state_dates_2026.csv").then(rows => {
-  d3.select("thead").append("tr").selectAll("th").data(COLUMNS).join("th").text(d => d[0]);
+  d3.select("#tableWrap thead").append("tr").selectAll("th").data(COLUMNS).join("th").text(d => d[0]);
 
   // a state's "Official source" rows are gathered into one full-width header above its deadlines
   const officialByState = d3.group(rows.filter(r => r.category === "Official source"), r => r.state);
   const shown = rows.filter((r, i) => r.category !== "Official source" || rows.findIndex(x => x.state === r.state && x.category === "Official source") === i);
 
-  const tr = d3.select("tbody").selectAll("tr").data(shown).join("tr")
+  const tr = d3.select("#tableWrap tbody").selectAll("tr").data(shown).join("tr")
     .classed("firstOfState", (r, i) => i > 0 && r.state !== shown[i - 1].state);
 
   const official = tr.filter(r => r.category === "Official source").classed("stateHead", true)
@@ -151,6 +203,10 @@ d3.csv("state_dates_2026.csv").then(rows => {
   });
 
   const deadline = tr.filter(r => r.category !== "Official source");
+  // hand-check dates come from the CSV's checked_by_jia column
+  const checkable = rows.filter(r => r.category !== "Official source");
+  d3.select("#checkStatus").text(`Hand-checked by Jia: ${checkable.filter(r => r.checked_by_jia).length} of ${checkable.length} rows`);
+  deadline.classed("checked", r => !!r.checked_by_jia);
   COLUMNS.forEach(([name, get, cls]) => {
     const td = deadline.append("td").attr("class", cls || null);
     if (get) td.text(get);
@@ -158,7 +214,7 @@ d3.csv("state_dates_2026.csv").then(rows => {
       // source name, then the state-specific page it links to, spelled out so it can be checked at a glance
       td.append("span").attr("class", "sourceName").text(r => r.source);
       td.append("a").attr("href", r => r.source_url).attr("target", "_blank")
-        .text(r => r.source_url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""));
+        .text(r => r.source_url.replace(/^https?:\/\/(www\.)?/, "").replace(/\?.*$/, "").replace(/\/$/, "")); // query strings (e.g. ?rev=…&hash=…) hidden; the link keeps them
     }
   });
 });
