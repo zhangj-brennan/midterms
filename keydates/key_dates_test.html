@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Key Dates Test</title>
 <style>
-  @font-face { font-family: "Benton"; src: url("Benton Sans/Benton Sans Book.otf"); }
-  @font-face { font-family: "BentonStrong"; src: url("Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
   *{ box-sizing: border-box; }
   html, body{ height: 100%; }
   body{
@@ -38,9 +38,21 @@
   }
   #bar button:hover{ background: #FFD200; }
   iframe{ flex: 1; width: 100%; border: 0; }
+  /* internal-only warning bar */
+  #testBanner{
+    background: #C8102E;
+    color: #fff;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 6px 16px;
+    margin: 0;
+  }
 </style>
 </head>
 <body>
+<div id="testBanner">FOR INTERNAL TESTING ONLY</div>
 <div id="bar">
   <span class="label">Test “today”:</span>
   <button id="prev" title="Previous day (←)">‹</button>
@@ -71,7 +83,7 @@ function show(i, now){
   dateLabel.textContent = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
   // reload the page only once the slider settles
   clearTimeout(timer);
-  timer = setTimeout(() => { frame.src = "key_dates.html?today=" + iso(d); }, now ? 0 : 150);
+  timer = setTimeout(() => { frame.src = "map.html?today=" + iso(d); }, now ? 0 : 150);
 }
 
 slider.addEventListener("input", () => show(+slider.value));

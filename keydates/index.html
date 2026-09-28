@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tests for Voting Page</title>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  body{
+    margin: 0 auto;
+    padding: 16px;
+    max-width: 400px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, sans-serif;
+  }
+  h1{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 20px;
+    margin: 0 0 12px;
+    padding-top: 10px;
+    border-top: 3px solid #111;
+  }
+  ul{ list-style: none; margin: 0; padding: 0; }
+  li{ padding: 8px 0; border-bottom: 1px solid #ddd; font-size: 14px; }
+  a{ font-family: "BentonStrong", system-ui, sans-serif; color: #111; text-decoration: none; }
+  a:hover{ background: #FFD200; }
+  .desc{ display: block; color: #555; margin-top: 2px; }
+  /* internal-only warning bar */
+  #testBanner{
+    background: #C8102E;
+    color: #fff;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 6px 16px;
+    margin: 0 0 16px;
+  }
+</style>
+</head>
+<body>
+<div id="testBanner">FOR INTERNAL TESTING ONLY</div>
+<h1>Tests for Voting Page</h1>
+<ul>
+  <li><a href="map.html">Map</a><span class="desc">The current key dates map.</span></li>
+  <li><a href="calendar.html">Calendar</a><span class="desc">Key dates by day, September through November.</span></li>
+  <li><a href="data.html">Source data</a><span class="desc">Every deadline by state, with a link to the source page for checking.</span></li>
+  <li><a href="key_dates_test.html">Tester</a><span class="desc">Preview the map as of any date from Sep 1 to Nov 30.</span></li>
+</ul>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Key Dates Source Data</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, sans-serif;
+  }
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    border-top: 3px solid #111;
+  }
+  .subtitle{ font-size: 13px; color: #555; margin-bottom: 16px; }
+
+  #tableWrap{ overflow-x: auto; }
+  table{ border-collapse: collapse; font-size: 12px; width: 100%; }
+  th{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    text-align: left;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    border-bottom: 2px solid #111;
+    padding: 6px 8px;
+  }
+  td{ padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  td.nowrap{ white-space: nowrap; } /* dates, times and source names stay on one line */
+  /* first row of each state starts with a heavier rule */
+  tr.firstOfState td{ border-top: 2px solid #111; }
+  tr:hover td{ background: #FFF6CC; }
+  a{ color: #007194; text-decoration: none; }
+  a:hover{ text-decoration: underline; }
+
+  #download{
+    display: inline-block;
+    margin: 24px 0 8px;
+    padding: 8px 14px;
+    border: 1px solid #111;
+    color: #111;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+  }
+  #download:hover{ background: #FFD200; text-decoration: none; }
+  /* internal-only warning bar */
+  #testBanner{
+    background: #C8102E;
+    color: #fff;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 6px 16px;
+    margin: -16px -16px 16px;
+  }
+</style>
+</head>
+<body>
+<div id="testBanner">FOR INTERNAL TESTING ONLY</div>
+<div id="title">Key 2026 Election Dates: Source Data</div>
+<div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it.</div>
+
+<div id="tableWrap"><table><thead></thead><tbody></tbody></table></div>
+
+<a id="download" href="state_dates_2026.csv" download>Download CSV</a>
+
+<script>
+// Columns shown, in CSV order; state_name and source_url are folded into State and Source
+const COLUMNS = [
+  ["State",       r => r.state_name],
+  ["Category",    r => r.category],
+  ["Label",       r => r.label],
+  ["Date",        r => r.date, "nowrap"],
+  ["Start",       r => r.start_date, "nowrap"],
+  ["End",         r => r.end_date, "nowrap"],
+  ["Time",        r => r.time, "nowrap"],
+  ["Source text", r => r.source_text],
+  ["Note",        r => r.note],
+  ["Source",      null, "nowrap"]
+];
+
+d3.csv("state_dates_2026.csv").then(rows => {
+  d3.select("thead").append("tr").selectAll("th").data(COLUMNS).join("th").text(d => d[0]);
+
+  const tr = d3.select("tbody").selectAll("tr").data(rows).join("tr")
+    .classed("firstOfState", (r, i) => i > 0 && r.state !== rows[i - 1].state);
+
+  COLUMNS.forEach(([name, get, cls]) => {
+    const td = tr.append("td").attr("class", cls || null);
+    if (get) td.text(get);
+    else td.append("a").attr("href", r => r.source_url).attr("target", "_blank").text(r => r.source);
+  });
+});
+</script>
+</body>
+</html>
