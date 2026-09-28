@@ -37,10 +37,16 @@
     padding: 6px 8px;
   }
   td{ padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
-  td.nowrap{ white-space: nowrap; } /* dates, times and source names stay on one line */
+  td.nowrap{ white-space: nowrap; } /* dates and times stay on one line */
+  td.source{ min-width: 200px; }
+  td.source .sourceName{ display: block; color: #555; }
+  td.source a{ overflow-wrap: anywhere; } /* long page URLs wrap instead of widening the table */
   /* first row of each state starts with a heavier rule */
   tr.firstOfState td{ border-top: 2px solid #111; }
   tr:hover td{ background: #FFF6CC; }
+  /* state header row with the official state source */
+  tr.stateHead td{ background: #F2F2F2; padding: 8px; font-size: 13px; }
+  tr.stateHead .stateName{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 14px; margin-right: 8px; }
   a{ color: #007194; text-decoration: none; }
   a:hover{ text-decoration: underline; }
 
@@ -70,7 +76,7 @@
 <body>
 <div id="testBanner">FOR INTERNAL TESTING ONLY</div>
 <div id="title">Key 2026 Election Dates: Source Data</div>
-<div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it.</div>
+<div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it. Each state starts with a link to its official state election site, from <a href="https://www.usa.gov/state-election-office" target="_blank">USA.gov</a>.</div>
 
 <div id="tableWrap"><table><thead></thead><tbody></tbody></table></div>
 
@@ -88,19 +94,43 @@ const COLUMNS = [
   ["Time",        r => r.time, "nowrap"],
   ["Source text", r => r.source_text],
   ["Note",        r => r.note],
-  ["Source",      null, "nowrap"]
+  ["Source",      null, "source"]
 ];
 
 d3.csv("state_dates_2026.csv").then(rows => {
   d3.select("thead").append("tr").selectAll("th").data(COLUMNS).join("th").text(d => d[0]);
 
-  const tr = d3.select("tbody").selectAll("tr").data(rows).join("tr")
-    .classed("firstOfState", (r, i) => i > 0 && r.state !== rows[i - 1].state);
+  // a state's "Official source" rows are gathered into one full-width header above its deadlines
+  const officialByState = d3.group(rows.filter(r => r.category === "Official source"), r => r.state);
+  const shown = rows.filter((r, i) => r.category !== "Official source" || rows.findIndex(x => x.state === r.state && x.category === "Official source") === i);
 
+  const tr = d3.select("tbody").selectAll("tr").data(shown).join("tr")
+    .classed("firstOfState", (r, i) => i > 0 && r.state !== shown[i - 1].state);
+
+  const official = tr.filter(r => r.category === "Official source").classed("stateHead", true)
+    .append("td").attr("colspan", COLUMNS.length);
+  official.append("span").attr("class", "stateName").text(r => r.state_name);
+  official.append("span").text(r => officialByState.get(r.state).length > 1 ? " Official sources: " : " Official source: ");
+  official.each(function(r){
+    officialByState.get(r.state).forEach((o, k) => {
+      if (k) d3.select(this).append("span").text(" · ");
+      d3.select(this).append("a").attr("href", o.source_url).attr("target", "_blank")
+        .text(o.label === "State election office"
+          ? o.source_url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")
+          : o.label);
+    });
+  });
+
+  const deadline = tr.filter(r => r.category !== "Official source");
   COLUMNS.forEach(([name, get, cls]) => {
-    const td = tr.append("td").attr("class", cls || null);
+    const td = deadline.append("td").attr("class", cls || null);
     if (get) td.text(get);
-    else td.append("a").attr("href", r => r.source_url).attr("target", "_blank").text(r => r.source);
+    else {
+      // source name, then the state-specific page it links to, spelled out so it can be checked at a glance
+      td.append("span").attr("class", "sourceName").text(r => r.source);
+      td.append("a").attr("href", r => r.source_url).attr("target", "_blank")
+        .text(r => r.source_url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""));
+    }
   });
 });
 </script>

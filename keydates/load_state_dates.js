@@ -4,7 +4,7 @@
 //
 // loadStateDates() resolves to STATE_DATES, keyed by state abbreviation:
 //   { name, election, registration: [], mailRequest: [], mailReturn: [], earlyVoting: [], note,
-//     registrationByMethod: { online, mail, inPerson }, usvoteUrl, vote411Url }
+//     registrationByMethod: { online, mail, inPerson }, usvoteUrl, vote411Url, officialSources: [{ label, url }] }
 // Deadline items are { label, text, note, date, time, start, end }, with empty CSV cells left out.
 
 const CSV_CATEGORY_KEYS = {
@@ -27,7 +27,8 @@ function loadStateDates(){
       if (r.source === "U.S. Vote Foundation") s.usvoteUrl = r.source_url;
       if (r.source === "VOTE411") s.vote411Url = r.source_url;
 
-      if (r.category === "Election") s.election = r.label;
+      if (r.category === "Official source") (s.officialSources ||= []).push({ label: r.label, url: r.source_url });
+      else if (r.category === "Election") s.election = r.label;
       else if (r.category === "State note") s.note = r.note;
       else if (r.category === "Voter registration by method") {
         if (r.label === "No registration required") return;
