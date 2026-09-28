@@ -38,6 +38,7 @@
   }
   td{ padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
   td.nowrap{ white-space: nowrap; } /* dates and times stay on one line */
+  td.where{ min-width: 180px; color: #555; }
   td.source{ min-width: 200px; }
   td.source .sourceName{ display: block; color: #555; }
   td.source a{ overflow-wrap: anywhere; } /* long page URLs wrap instead of widening the table */
@@ -76,7 +77,7 @@
 <body>
 <div id="testBanner">FOR INTERNAL TESTING ONLY</div>
 <div id="title">Key 2026 Election Dates: Source Data</div>
-<div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it. Each state starts with a link to its official state election site, from <a href="https://www.usa.gov/state-election-office" target="_blank">USA.gov</a>.</div>
+<div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it; "Where on the source page" says where the row's text appears. Notes from U.S. Vote Foundation are in tooltips: hover the (!) icon next to the deadline to see them. Each state starts with a link to its official state election site, from <a href="https://www.usa.gov/state-election-office" target="_blank">USA.gov</a>.</div>
 
 <div id="tableWrap"><table><thead></thead><tbody></tbody></table></div>
 
@@ -94,8 +95,36 @@ const COLUMNS = [
   ["Time",        r => r.time, "nowrap"],
   ["Source text", r => r.source_text],
   ["Note",        r => r.note],
+  ["Where on the source page", r => whereOnPage(r), "where"],
   ["Source",      null, "source"]
 ];
+
+// U.S. Vote Foundation section heading for each CSV category
+const USVOTE_SECTIONS = {
+  "Voter registration": "Voter Registration Deadline",
+  "Mail ballot request": "Absentee Ballot Request Deadline",
+  "Mail ballot return": "Absentee Ballot Return Deadline",
+  "Early voting": "Early Voting Available"
+};
+/* Where a row's text appears on its source page. On U.S. Vote Foundation pages, deadline notes
+   sit in a tooltip behind the (!) icon next to the deadline, so they don't show up in find-on-page. */
+function whereOnPage(r){
+  if (r.source === "U.S. Vote Foundation") {
+    const base = "U.S. Domestic Voters tab → Nov 3, 2026 election";
+    if (r.category === "Election") return `U.S. Domestic Voters tab → heading of the Nov 3, 2026 election`;
+    if (r.category === "State note") return `${base} → paragraph below the deadline columns`;
+    const section = USVOTE_SECTIONS[r.category];
+    if (!section) return "";
+    return `${base} → "${section}"` + (r.label ? ` → "${r.label}"` : "") +
+      (r.note ? ". Note: hover the (!) icon next to it" : "");
+  }
+  if (r.source === "VOTE411") {
+    if (r.label === "No registration required") return `"Voter Registration Deadlines" section`;
+    const onPage = r.label.replace(/^By mail/, "By Mail").replace(/^In person/, "In Person");
+    return `"Upcoming Election Dates & Registration Deadlines" → "Registration Deadlines" → "${onPage}"`;
+  }
+  return "";
+}
 
 d3.csv("state_dates_2026.csv").then(rows => {
   d3.select("thead").append("tr").selectAll("th").data(COLUMNS).join("th").text(d => d[0]);

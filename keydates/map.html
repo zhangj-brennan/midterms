@@ -68,20 +68,6 @@
   #mapLegend .swatch.soonState{ background: linear-gradient(to bottom right, #DCDCDC 50%, #FFD200 50%); border: none; }
 
 
-  /* filter buttons */
-  #filters{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-  #filters button{
-    font-family: "BentonMedium", system-ui, sans-serif;
-    font-size: 12px;
-    color: #111;
-    background: #fff;
-    border: 1px solid #111;
-    padding: 4px 10px;
-    cursor: pointer;
-  }
-  #filters button:hover{ background: #eee; }
-  #filters button.active{ background: #111; color: #fff; }
-
   #mapLegend{
     display: flex;
     flex-wrap: wrap;
@@ -153,7 +139,6 @@
   <div class="panel">
       <div id="title">Key 2026 Election Dates By State</div>
       <div class="subtitle">Hover over a state to see its key dates.</div>
-      <div id="filters" role="group" aria-label="Filter key dates"></div>
       <div id="mapLegend"></div>
       <div id="map"></div>
   </div>
@@ -229,46 +214,8 @@ const GRID_STATES = parseStateGridText(document.getElementById("grid").textConte
 const minY = d3.min(GRID_STATES, d => d.y), minX = d3.min(GRID_STATES, d => d.x);
 GRID_STATES.forEach(d => { d.y -= minY; d.x -= minX; });
 
-/* ---------- filter buttons ---------- */
-const FILTERS = [
-  { key: "all",          label: "All" },
-  { key: "registration", label: "Registration" },
-  { key: "mail",         label: "Mail ballots" },
-  { key: "early",        label: "Early voting" }
-];
-// filter group of each key-date event type (Election Day shows under every filter)
-const TYPE_GROUP = {
-  "Registration deadline": "registration",
-  "Mail ballot request deadline": "mail",
-  "Mail ballots due": "mail",
-  "Mail ballots due if postmarked by Election Day": "mail",
-  "Early voting begins": "early",
-  "Early voting ends": "early"
-};
-// ?filter=registration|mail|early opens the map on that filter
-const FILTER_PARAM = new URLSearchParams(location.search).get("filter");
-let filter = FILTERS.some(f => f.key === FILTER_PARAM) ? FILTER_PARAM : "all";
-const inFilter = group => filter === "all" || group === filter;
-
-function drawFilters(){
-  d3.select("#filters").selectAll("button")
-    .data(FILTERS)
-    .join("button")
-    .attr("type", "button")
-    .text(d => d.label)
-    .classed("active", d => d.key === filter)
-    .attr("aria-pressed", d => d.key === filter)
-    .on("click", (e, d) => {
-      filter = d.key;
-      drawFilters();
-      drawMap();
-    });
-}
-
 /* ---------- map ---------- */
 function drawMap(){
-  d3.select("#map").html("");
-  d3.select("#mapLegend").html("");
   const tileSize = CONFIG.tileSize;
   const cellSize = Math.round(tileSize * CONFIG.tileGapFactor);
   const gridWidth = d3.max(GRID_STATES, d => d.x) + 1;
@@ -306,8 +253,8 @@ function drawMap(){
   state.append("rect").attr("class", "tile")
     .attr("x", -tileSize/2).attr("y", -tileSize/2)
     .attr("width", tileSize).attr("height", tileSize);
-  // fill states that have a key date today (in the selected filter)
-  const eventsOn = iso => (EVENTS_BY_DATE.get(iso) || []).filter(e => e.type !== "Election Day" && inFilter(TYPE_GROUP[e.type]));
+  // fill states that have a key date today
+  const eventsOn = iso => (EVENTS_BY_DATE.get(iso) || []).filter(e => e.type !== "Election Day");
   const todayEvs = eventsOn(TODAY);
   const todayStates = new Set(todayEvs.map(e => e.state));
   state.classed("today", d => todayStates.has(d.name));
@@ -324,7 +271,7 @@ function drawMap(){
 
   // half-yellow tiles for the next upcoming instance of each deadline type after today, through Election Day
   const upcoming = [...EVENTS_BY_DATE.keys()].filter(iso => iso > TODAY && iso <= ELECTION_DAY).sort();
-  const upNext = EVENT_TYPES.filter(t => t !== "Election Day" && inFilter(TYPE_GROUP[t])).map(t => {
+  const upNext = EVENT_TYPES.filter(t => t !== "Election Day").map(t => {
     const date = upcoming.find(iso => eventsOn(iso).some(e => e.type === t));
     if (!date) return null;
     const evs = eventsOn(date).filter(e => e.type === t);
@@ -371,9 +318,7 @@ function renderPopup(abbr){
   panel.append("h2").text(s.name);
   panel.append("div").attr("class", "electionName").text(s.election + " — " + long(ELECTION_DAY));
 
-  const shown = e => !e.group || inFilter(e.group);
-  const { dated: allDated, undated: allUndated } = stateKeyDates(s);
-  const dated = allDated.filter(shown), undated = allUndated.filter(shown);
+  const { dated, undated } = stateKeyDates(s);
   const byDate = d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b));
   const next = (byDate.find(([date]) => date >= TODAY) || [])[0];
   byDate.forEach(([date, evs]) => {
@@ -409,10 +354,8 @@ function stateKeyDates(s){
   const dated = [], undated = [];
   const how = i => i.label ? i.label.replace(/\s+by$/i, "") : "";
   const sentence = t => t.charAt(0) + t.slice(1).toLowerCase(); // "Early Voting" -> "Early voting"
-  // each row is tagged with the filter group of the section that pushes it (Election Day has none)
-  let group = "registration";
   const push = (date, what, i = {}, extra = {}) => (date ? dated : undated).push({
-    date, what, group,
+    date, what,
     how: how(i), time: i.time, note: i.note, text: date ? null : i.text, ...extra
   });
 
@@ -421,7 +364,7 @@ function stateKeyDates(s){
   const methods = [["online", "online"], ["mail", "by mail"], ["inPerson", "in person"]]
     .filter(([k]) => r[k])
     .map(([k, lab]) => ({ date: r[k].date, lab: lab + (r[k].qualifier ? ` (${r[k].qualifier})` : "") }));
-  if (!methods.length) undated.push({ what: "No voter registration required", group });
+  if (!methods.length) undated.push({ what: "No voter registration required" });
   d3.groups(methods, m => m.date).forEach(([date, ms]) =>
     push(date, "Registration deadline", {}, { how: ms.map(m => m.lab).join(", ") }));
   // same-day / election-day registration windows from U.S. Vote
@@ -432,7 +375,6 @@ function stateKeyDates(s){
     } else push(i.date, "Election Day registration", {}, { time: i.time, note: i.note });
   });
 
-  group = "mail";
   (s.mailRequest || []).forEach(i => {
     if (i.start) {
       push(i.start, `${sentence(how(i))} begins`, {}, { note: i.note });
@@ -440,7 +382,6 @@ function stateKeyDates(s){
     } else push(i.date, "Mail ballot request deadline", i);
   });
   (s.mailReturn || []).forEach(i => push(i.date, "Mail ballots due", i));
-  group = "early";
   (s.earlyVoting || []).forEach(i => {
     const what = sentence(i.label || "Early voting");
     if (i.start) {
@@ -448,7 +389,6 @@ function stateKeyDates(s){
       if (i.end) push(i.end, `${what} ends`);
     } else push(null, what, i, { how: "" });
   });
-  group = null;
   push(ELECTION_DAY, "Election Day");
   return { dated, undated };
 }
@@ -530,7 +470,6 @@ function todayByType(evs, fullNames){
   ]);
 }
 
-drawFilters();
 drawMap();
 </script>
 </body>
