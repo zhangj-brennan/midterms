@@ -59,12 +59,15 @@ function stateKeyDates(s, electionDay){
     } else push(i.date, "Mail ballot request deadline", i);
   });
   (s.mailReturn || []).forEach(i => push(i.date, "Mail ballots due", i));
+  // "Early Voting" rows read "In-person early voting", since mail voting is early voting too;
+  // rows with no dates saying there is none ("None on Record", "Not available…") read "No early in-person voting"
   (s.earlyVoting || []).forEach(i => {
-    const what = sentence(i.label || "Early voting");
+    const what = /^early voting$/i.test(i.label || "Early voting") ? "In-person early voting" : sentence(i.label);
     if (i.start) {
       push(i.start, `${what} begins`, {}, { note: i.note, src: [i.csv] });
       if (i.end) push(i.end, `${what} ends`, {}, { src: [i.csv] });
-    } else push(null, what, i, { how: "" });
+    } else if (/None on Record|Not available/i.test(i.text || "")) push(null, "No early in-person voting", i, { how: "", text: null });
+    else push(null, what, i, { how: "" });
   });
   push(electionDay, "Election Day");
   return { dated, undated };
@@ -78,8 +81,8 @@ const EVENT_TYPES = [
   "Same-day registration ends",
   "Mail ballot request deadline",
   "Emergency ballot period ends",
-  "Early voting begins",
-  "Early voting ends",
+  "In-person early voting begins",
+  "In-person early voting ends",
   "Mail ballots due",
   "Mail ballots due if postmarked by Election Day"
 ];
@@ -126,8 +129,8 @@ function buildEvents(stateDates, electionDay){
     // (a state can list several windows, e.g. early voting and in-person absentee voting).
     const starts = (s.earlyVoting || []).filter(i => i.start).sort((a, b) => d3.ascending(a.start, b.start));
     const ends = (s.earlyVoting || []).filter(i => i.end).sort((a, b) => d3.ascending(a.end, b.end));
-    if (starts.length) add(starts[0].start, "Early voting begins", abbr, undefined, [starts[0].csv]);
-    if (ends.length) add(ends[ends.length - 1].end, "Early voting ends", abbr, undefined, [ends[ends.length - 1].csv]);
+    if (starts.length) add(starts[0].start, "In-person early voting begins", abbr, undefined, [starts[0].csv]);
+    if (ends.length) add(ends[ends.length - 1].end, "In-person early voting ends", abbr, undefined, [ends[ends.length - 1].csv]);
 
     // Mail ballots due: two event types.
     //   "…if postmarked by Election Day": the FIRST return row whose label contains "Postmarked".
