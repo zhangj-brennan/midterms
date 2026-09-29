@@ -80,7 +80,7 @@
   #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; flex: none; margin-top: 2px; }
   #mapLegend .type{ font-family: "BentonStrong", system-ui, sans-serif; }
   #mapLegend .upNext{ display: block; margin-top: 2px; }
-  #mapLegend .upNext .when{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #mapLegend .when{ font-family: "BentonStrong", system-ui, sans-serif; }
 
   #tooltip .stateList{ color: #111; }
 
@@ -272,9 +272,12 @@ function drawMap(){
     it.append("span").attr("class", "swatch todayState");
     const txt = it.append("span");
     txt.append("span").attr("class", "type").text(`Today (${long(TODAY)}): `);
-    txt.append("span").text(todayTypes.length
-      ? todayTypes.map(([t, list]) => `${t} in ${list.join(", ")}`).join("; ")
-      : "No key dates");
+    if (!todayTypes.length) txt.append("span").text("No key dates");
+    todayTypes.forEach(([t, list]) => {
+      const line = txt.append("span").attr("class", "upNext");
+      line.append("span").attr("class", "when").text(`${t}: `);
+      line.append("span").text(list.join(", "));
+    });
   }
 
   // half-yellow tiles for the next upcoming instance of each deadline type after today, through Election Day:

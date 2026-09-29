@@ -75,7 +75,9 @@ function stateKeyDates(s, electionDay){
 const EVENT_TYPES = [
   "Election Day",
   "Registration deadline",
+  "Same-day registration ends",
   "Mail ballot request deadline",
+  "Emergency ballot period ends",
   "Early voting begins",
   "Early voting ends",
   "Mail ballots due",
@@ -103,10 +105,22 @@ function buildEvents(stateDates, electionDay){
     );
     byDate.forEach((rows, date) => add(date, "Registration deadline", abbr, rows.map(r => r.lab).join(", "), rows.map(r => r.csv)));
 
+    // Same-day registration ends: the LATEST end among the U.S. Vote registration ranges the popup
+    // shows as same-day registration (labels containing "Same Day" or "Election Day"). Ends on
+    // Election Day are left out, like the registration deadlines above.
+    const sdr = (s.registration || []).filter(i => i.end && /Same Day|Election Day/i.test(i.label) && i.end !== electionDay)
+      .sort((a, b) => d3.ascending(a.end, b.end));
+    if (sdr.length) add(sdr[sdr.length - 1].end, "Same-day registration ends", abbr, undefined, [sdr[sdr.length - 1].csv]);
+
     // Mail ballot request deadline: the state's FIRST mail-request row (in CSV order) that has a
     // single date. Rows with a date range (e.g. emergency ballot periods) are skipped.
     const req = (s.mailRequest || []).find(i => i.date);
     if (req) add(req.date, "Mail ballot request deadline", abbr, undefined, [req.csv]);
+
+    // Emergency ballot period ends: the LATEST end among the mail-request rows that have a date range
+    // (the rows skipped above).
+    const emerg = (s.mailRequest || []).filter(i => i.end).sort((a, b) => d3.ascending(a.end, b.end));
+    if (emerg.length) add(emerg[emerg.length - 1].end, "Emergency ballot period ends", abbr, undefined, [emerg[emerg.length - 1].csv]);
 
     // Early voting begins / ends: the EARLIEST start and the LATEST end across all early-voting rows
     // (a state can list several windows, e.g. early voting and in-person absentee voting).
