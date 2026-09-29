@@ -173,6 +173,8 @@ function whereOnPage(r){
     const onPage = r.label.replace(/^By mail/, "By Mail").replace(/^In person/, "In Person");
     return `"Upcoming Election Dates & Registration Deadlines" → "Registration Deadlines" → "${onPage}"`;
   }
+  // NCSL: one table of every state's early in-person voting rules; the link's #anchor jumps to it
+  if (r.source === "NCSL") return `"States and Territories with Early In-Person Voting" table → "${r.state_name}" row → "Early Voting Begins" and "Early Voting Ends"`;
   // other sources (e.g. a state's own PDF): the "Source text" column is quoted from the page
   if (r.source_text) return `Search the ${/\.pdf(\?|$)/i.test(r.source_url) ? "PDF" : "page"} for the "Source text" wording`;
   return "";

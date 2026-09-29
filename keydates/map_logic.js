@@ -23,13 +23,13 @@
      Mail ballot return                      -> "Mail ballots due — <label>" (every row)
      Early voting                            -> range: "<Label> begins/ends"; no dates: listed under "Other"
      (always)                                -> "Election Day" on Nov 3
-   The row's label becomes the "how" text after " — " with a trailing " by" dropped; times are
-   shortened ("5:00PM" -> "5pm"); abbreviated dates in labels/notes are spelled out by spellDates()
-   in map.html. The Election row's label and the State note are shown by renderPopup() directly. */
+   The row's label becomes the "how" text after " — " with a trailing " by" dropped; times
+   ("5:00PM" -> "5 p.m.") and abbreviated dates in labels/notes are rewritten by spellDates(), and
+   everything is put in sentence case by sentenceCase(), both in map.html. The Election row's label and the State note are shown by renderPopup() directly. */
 function stateKeyDates(s, electionDay){
   const dated = [], undated = [];
   const how = i => i.label ? i.label.replace(/\s+by$/i, "") : "";
-  const sentence = t => t.charAt(0) + t.slice(1).toLowerCase(); // "Early Voting" -> "Early voting"
+  const sentence = t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase(); // "Early Voting" -> "Early voting"
   const push = (date, what, i = {}, extra = {}) => (date ? dated : undated).push({
     date, what,
     how: how(i), time: i.time, note: i.note, text: date ? null : i.text,
