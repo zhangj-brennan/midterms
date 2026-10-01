@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Early Voting Calendar</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    margin-bottom: 4px;
+    border-top: 3px solid #111;
+  }
+  #subtitle{ font-size: 13px; line-height: 1.4; color: #555; margin-bottom: 16px; }
+
+  /* three months side by side; stacked on phones */
+  #calendar{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .month h4{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 14px;
+    margin: 0 0 6px;
+  }
+  .days{
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+  }
+  .dow{
+    font-size: 11px;
+    text-align: center;
+    padding-bottom: 3px;
+  }
+  .day{
+    position: relative;
+    aspect-ratio: 1;
+    min-width: 0;
+  }
+  .day.data{ cursor: default; }
+  .day.out{ background: none; }
+  /* date number centered in its square, sized to the square */
+  .day .num{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "BentonMedium", system-ui, sans-serif;
+    font-size: var(--num-size, 15px);
+    line-height: 1;
+  }
+  .day.out .num{ color: #B8B8B8; }
+  /* markers: Election Day solid, peak days dotted */
+  .day.eday{ outline: 2px solid #111; outline-offset: -2px; }
+  /* white band under the dots so they show on the darkest squares */
+  .day.peak{ outline: 2px dotted #111; outline-offset: -2px; box-shadow: inset 0 0 0 2px #fff; }
+  .day.data:hover, .day.active{ outline: 2px solid #111; outline-offset: 0; z-index: 1; }
+
+
+  /* legend under the calendar */
+  /* legend: shading on the first line, markers on the second */
+  #legend{
+    font-size: 12px;
+    margin-top: 16px;
+  }
+  #legend .legendRow{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+  }
+  #legend .legendRow + .legendRow{ margin-top: 8px; }
+  #legend .legendTitle{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #legend .item{ display: flex; align-items: center; gap: 6px; }
+  #legend .swatch{ width: 14px; height: 14px; flex: none; background: #F2F2F2; }
+  #legend .ramp{ width: 140px; height: 10px; flex: none; }
+  #legend .swatch.eday{ background: #fff; outline: 2px solid #111; outline-offset: -2px; }
+  #legend .swatch.peak{ background: #fff; outline: 2px dotted #111; outline-offset: -2px; }
+
+  #tip{
+    position: fixed;
+    z-index: 10;
+    display: none;
+    max-width: 260px;
+    background: #fff;
+    border: 1px solid #111;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  #tip .tipName{ font-family: "BentonStrong", system-ui, sans-serif; display: block; }
+  #tip .desc{ color: #555; }
+
+  #source{
+    font-size: 12px;
+    color: #555;
+    margin-top: 12px;
+    line-height: 1.4;
+  }
+  #source a{ color: #007194; text-decoration: none; }
+  #source a:hover{ text-decoration: underline; }
+
+  @media (max-width: 600px){
+    #title{ font-size: 16px; }
+    #calendar{ grid-template-columns: minmax(0, 380px); gap: 18px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div id="title">Number of States &amp; Territories With Early In-Person Voting Available</div>
+  <div id="subtitle">
+    <div>Each square shows how many jurisdictions have in-person early voting open on that calendar date. Sept 4-Nov 3, 2026 | Out of 51 jurisdictions: 50 states, D.C., Guam, Puerto Rico, and the U.S.</div>
+  </div>
+
+  <div id="calendar"></div>
+
+  <div id="legend"></div>
+
+  <div id="source"></div>
+</div>
+
+<script>
+  const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const DOW = ["S","M","T","W","T","F","S"];
+  const ELECTION_DAY = new Date(2026, 10, 3);
+  const OFF_INK = "#B8B8B8";   // dates with no early voting, and dates outside the range
+  const LIGHT = "#F1DDF1", DARK = "#711471";   // brand purple, light to dark
+  const SOURCE_URL = "https://www.ncsl.org/elections-and-campaigns/early-in-person-voting";
+  const COUNT_COL = "States/Territories with Early Voting Available";
+
+  const parseDate = s => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((s || "").trim());
+    return m ? new Date(+m[1], m[2] - 1, +m[3]) : null;
+  };
+  const fmtDate = d => `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
+  const plural = (k, word) => `${k} ${word}${k === 1 ? "" : "s"}`;
+
+  function el(tag, cls, parent){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Tooltip: hover a day, or tap it on touch screens
+  const tip = el("div", "", document.body);
+  tip.id = "tip";
+  let activeCell = null;
+  function showTip(cell, d, x, y){
+    tip.innerHTML = "";
+    el("span", "tipName", tip).textContent = `${WEEKDAYS[d.date.getDay()]}, ${fmtDate(d.date)}`;
+    el("div", "", tip).textContent = `${plural(d.count, "jurisdiction")} with early voting open`;
+    if (d.eday) el("div", "desc", tip).textContent = "Election Day";
+    if (d.peak) el("div", "desc", tip).textContent = "Peak day";
+    tip.style.display = "block";
+    moveTip(x, y);
+    if (activeCell && activeCell !== cell) activeCell.classList.remove("active");
+    activeCell = cell;
+    cell.classList.add("active");
+  }
+  function moveTip(x, y){
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = x + 14, top = y + 14;
+    if (left + w > window.innerWidth - 8) left = x - w - 14;
+    if (left < 8) left = 8;
+    if (top + h > window.innerHeight - 8) top = y - h - 14;
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function hideTip(){
+    tip.style.display = "none";
+    if (activeCell) activeCell.classList.remove("active");
+    activeCell = null;
+  }
+  document.addEventListener("click", hideTip);
+  window.addEventListener("scroll", hideTip, { passive: true });
+
+  fetch("early_voting_daily_totals.csv").then(r => r.text()).then(text => {
+    const rows = d3.csvParse(text);
+
+    const src = document.getElementById("source");
+    src.append("Source: ");
+    const a = el("a", "", src);
+    a.href = SOURCE_URL;
+    a.textContent = "National Conference of State Legislatures";
+    a.target = "_blank";
+    a.rel = "noopener";
+
+    // Daily counts, keyed by date
+    const counts = new Map();
+    rows.forEach(r => {
+      const d = parseDate(r.Date);
+      const k = parseFloat(r[COUNT_COL]);
+      if (d && !isNaN(k)) counts.set(d.getTime(), Math.round(k));
+    });
+    const dates = [...counts.keys()].sort((x, y) => x - y);
+
+    // Days shown: first date with any early voting open (skipping the leading
+    // run of zeros) through Election Day
+    const first = new Date(dates.find(t => counts.get(t) > 0));
+    const inRange = d => d >= first && d <= ELECTION_DAY;
+
+    const shown = [...counts].filter(([t]) => inRange(new Date(t))).map(([, k]) => k);
+    const max = d3.max(shown);
+    const color = d3.scaleLinear().domain([1, max]).range([LIGHT, DARK]).interpolate(d3.interpolateLab);
+    const fill = k => k === 0 ? "none" : color(k);
+    // dark text on light cells, white on dark ones
+    const ink = k => k === 0 ? OFF_INK : d3.lab(color(k)).l < 55 ? "#fff" : "#111";
+
+    // One calendar per month, first month through Election Day's month
+    const cal = document.getElementById("calendar");
+    for (let m = new Date(first.getFullYear(), first.getMonth(), 1); m <= ELECTION_DAY; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)){
+      const month = el("div", "month", cal);
+      el("h4", "", month).textContent = MONTHS_LONG[m.getMonth()];
+      const grid = el("div", "days", month);
+      DOW.forEach(t => el("div", "dow", grid).textContent = t);
+      for (let i = 0; i < m.getDay(); i++) el("div", "", grid);
+      const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+      for (let dnum = 1; dnum <= daysInMonth; dnum++){
+        const date = new Date(m.getFullYear(), m.getMonth(), dnum);
+        const cell = el("div", "day", grid);
+        el("span", "num", cell).textContent = dnum;
+        if (!inRange(date)){
+          cell.classList.add("out");
+          continue;
+        }
+        const d = {
+          date,
+          count: counts.get(date.getTime()) ?? 0,
+          eday: date.getTime() === ELECTION_DAY.getTime(),
+        };
+        d.peak = d.count === max;
+        cell.classList.add("data");
+        if (d.eday) cell.classList.add("eday");
+        else if (d.peak) cell.classList.add("peak");
+        cell.style.background = fill(d.count);
+        cell.style.color = ink(d.count);
+        cell.addEventListener("mouseenter", e => showTip(cell, d, e.clientX, e.clientY));
+        cell.addEventListener("mousemove", e => moveTip(e.clientX, e.clientY));
+        cell.addEventListener("mouseleave", hideTip);
+        cell.addEventListener("click", e => { e.stopPropagation(); showTip(cell, d, e.clientX, e.clientY); });
+      }
+    }
+
+    // Legend: title and ramp on one line, the two markers on the next
+    const legendEl = document.getElementById("legend");
+    const legend = el("div", "legendRow", legendEl);
+    const markers = el("div", "legendRow", legendEl);
+    el("div", "legendTitle", legend).textContent = "Jurisdictions with early voting open";
+    const rampItem = el("div", "item", legend);
+    rampItem.append("1");
+    const ramp = el("span", "ramp", rampItem);
+    ramp.style.background = `linear-gradient(to right, ${color(1)}, ${color(max)})`;
+    rampItem.append(`${max}`);
+    const peakItem = el("div", "item", markers);
+    el("span", "swatch peak", peakItem);
+    peakItem.append(`Peak: ${max}`);
+    const edayItem = el("div", "item", markers);
+    el("span", "swatch eday", edayItem);
+    edayItem.append("Election Day");
+
+    // Date numbers scale with the squares
+    function layout(){
+      const size = cal.querySelector(".day").getBoundingClientRect().width;
+      cal.style.setProperty("--num-size", Math.max(8, Math.min(16, Math.round(size * 0.42))) + "px");
+    }
+    layout();
+    window.addEventListener("resize", layout);
+  });
+</script>
+</body>
+</html>

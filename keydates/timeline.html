@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>2026 Election Timeline</title>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    margin-bottom: 12px;
+    border-top: 3px solid #111;
+  }
+
+
+  /* label column + track column; the track holds the month axis, bars and markers */
+  #chart{
+    --label-w: 230px;
+    position: relative;
+  }
+
+  .row{
+    display: grid;
+    grid-template-columns: var(--label-w) 1fr;
+    align-items: center;
+  }
+  .row.axis{ border-bottom: 1px solid #111; }
+  .row:not(.axis){ border-bottom: 1px solid #ddd; }
+
+  .label{
+    padding: 4px 12px 4px 0;
+    font-size: 13px;
+    white-space: nowrap;
+    line-height: 1.25;
+  }
+  /* labels sit above the gridlines and reference lines, so lines never cross the text */
+  .label{ position: relative; z-index: 2; }
+  .label .name, .label .note{ display: table; background: #fff; }
+  .label .name{ font-family: "BentonMedium", system-ui, sans-serif; }
+  .label .note{ color: #555; font-size: 12px; margin-top: 2px; }
+
+  .track{
+    position: relative;
+    height: 28px;
+  }
+  .axis .track{ height: 36px; }
+
+  .month{
+    position: absolute;
+    bottom: 0;
+    font-size: 12px;
+    color: #111;
+    padding-left: 4px;
+    border-left: 1px solid #111;
+    line-height: 1;
+    height: 18px;
+  }
+  /* year shown above the first month of a new year */
+  .month .year{
+    position: absolute;
+    bottom: 100%;
+    left: 4px;
+    padding-bottom: 3px;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    color: #111;
+  }
+
+  .bar{
+    position: absolute;
+    top: 6px;
+    height: 16px;
+    background: #FFD200;
+    cursor: default;
+  }
+  .bar:hover, .bar.active{ outline: 1px solid #111; }
+
+  /* rollover with the exact dates */
+  #tip{
+    position: fixed;
+    z-index: 10;
+    display: none;
+    background: #fff;
+    border: 1px solid #111;
+    padding: 5px 8px;
+    font-size: 12px;
+    line-height: 1.3;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #tip .tipName{ font-family: "BentonStrong", system-ui, sans-serif; display: block; }
+
+  .point{
+    position: absolute;
+    top: 13px;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    background: #007194;
+    transform: rotate(45deg) scale(.75);
+  }
+  .point.post{ background: #5B6770; }
+  .point.eday{ background: #111; }
+
+  .gridline{
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid #ddd;
+  }
+
+  /* reference lines drawn across every row, with their labels under the chart */
+  .vline{
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 2px dotted #111;
+    pointer-events: none;
+  }
+
+  /* date on the first line, name wrapping underneath */
+  .vline-label{
+    position: absolute;
+    left: -6px;
+    width: max-content;
+    max-width: 120px;
+    z-index: 1;
+    font-size: 11px;
+    line-height: 1.25;
+    background: #fff;
+  }
+  .vline-label .date{ display: block; font-family: "BentonStrong", system-ui, sans-serif; }
+
+  #notes{
+    font-size: 12px;
+    color: #555;
+    margin-top: 16px;
+    line-height: 1.4;
+  }
+
+  /* narrow screens: stack the label above its track */
+  @media (max-width: 600px){
+    /* narrower label column; labels wrap instead of overlapping the chart */
+    #chart{ --label-w: 110px; }
+    #title{ font-size: 16px; }
+    .label{ padding: 3px 8px 3px 0; font-size: 11px; line-height: 1.15; white-space: normal; }
+    .label .note{ font-size: 10px; margin-top: 0; }
+    .track{ height: 22px; }
+    .axis .track{ height: 30px; }
+    .bar{ top: 5px; height: 12px; }
+    .point{ top: 6px; }
+    .month{ font-size: 10px; height: 15px; }
+    .vline-label{ font-size: 10px; max-width: 90px; }
+  }
+
+
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div id="title">Key voting and post-election periods</div>
+
+  <div id="chart"></div>
+
+
+</div>
+
+<script>
+  // Window shown on the timeline
+  const START = new Date(2026, 8, 1);   // September 1, 2026
+  const END   = new Date(2027, 0, 31);  // January 31, 2027 (room for the January 3 label)
+
+  // start/end as [month (1-12), day, year]; point events have no end
+  const EVENTS = [
+    { name: "Mail-in voting",               start: [9, 4, 2026],  end: [11, 3, 2026] },
+    { name: "Early in-person voting",       start: [9, 14, 2026], end: [11, 3, 2026] },
+    { name: "State voter registration deadlines", start: [10, 4, 2026], end: [11, 3, 2026] },
+    { name: "Ballot curing",                start: [11, 3, 2026], end: [11, 25, 2026], cls: "post" },
+    { name: "Mail ballot receipt deadlines", start: [11, 3, 2026], end: [11, 17, 2026], cls: "post",
+      note: "Domestic and military/overseas" },
+    { name: "State certification",          start: [11, 6, 2026], end: [12, 18, 2026], cls: "post" },
+  ];
+
+  // Full-height reference lines
+  const LINES = [
+    { label: "Deadline to mail military & overseas ballots", date: [9, 19, 2026] },
+    { label: "Election Day", date: [11, 3, 2026] },
+    { label: "Congress convenes", date: [1, 3, 2027] },
+  ];
+
+  const MONTHS_SHORT = ["Jan.","Feb.","Mar.","Apr.","May","June","July","Aug.","Sept.","Oct.","Nov.","Dec."];
+  const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  const toDate = ([m, d, y]) => new Date(y, m - 1, d);
+  const pct = date => ((date - START) / (END - START)) * 100;
+
+  const chart = document.getElementById("chart");
+
+  // Rollover tooltip; tap to show on touch screens
+  const fmtDate = ([m, d, y]) => `${MONTHS_LONG[m - 1]} ${d}, ${y}`;
+  const tip = document.createElement("div");
+  tip.id = "tip";
+  document.body.appendChild(tip);
+  let activeBar = null;
+
+  function showTip(bar, name, dates, x, y){
+    tip.innerHTML = "";
+    const n = document.createElement("span");
+    n.className = "tipName";
+    n.textContent = name;
+    tip.append(n, dates);
+    tip.style.display = "block";
+    moveTip(x, y);
+    if (activeBar && activeBar !== bar) activeBar.classList.remove("active");
+    activeBar = bar;
+    bar.classList.add("active");
+  }
+  function moveTip(x, y){
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = x + 12, top = y - h - 10;
+    if (left + w > window.innerWidth - 8) left = x - w - 12;
+    if (left < 8) left = 8;
+    if (top < 8) top = y + 16;
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function hideTip(){
+    tip.style.display = "none";
+    if (activeBar) activeBar.classList.remove("active");
+    activeBar = null;
+  }
+  function addTip(bar, name, dates){
+    bar.addEventListener("mouseenter", e => showTip(bar, name, dates, e.clientX, e.clientY));
+    bar.addEventListener("mousemove", e => moveTip(e.clientX, e.clientY));
+    bar.addEventListener("mouseleave", hideTip);
+    bar.addEventListener("click", e => {
+      e.stopPropagation();
+      showTip(bar, name, dates, e.clientX, e.clientY);
+    });
+  }
+  document.addEventListener("click", hideTip);
+  window.addEventListener("scroll", hideTip, { passive: true });
+
+  function el(tag, cls, parent){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Month gridlines continue each axis tick down the chart, behind the bars
+  const grid = el("div", "", chart);
+  Object.assign(grid.style, {
+    position: "absolute", top: "0", bottom: "0",
+    left: "var(--label-w)", right: "0", pointerEvents: "none"
+  });
+
+  // Month axis
+  const axisRow = el("div", "row axis", chart);
+  el("div", "label", axisRow);
+  const axisTrack = el("div", "track", axisRow);
+  for (let d = new Date(START); d < END; d.setMonth(d.getMonth() + 1)){
+    const m = el("div", "month", axisTrack);
+    m.style.left = pct(d) + "%";
+    const mn = el("span", "mname", m);
+    mn.textContent = MONTHS_LONG[d.getMonth()];
+    mn.dataset.full = MONTHS_LONG[d.getMonth()];
+    mn.dataset.short = MONTHS_SHORT[d.getMonth()];
+    if (d.getMonth() === 0) el("span", "year", m).textContent = d.getFullYear();
+    el("div", "gridline", grid).style.left = pct(d) + "%";
+  }
+
+  // One row per event
+  EVENTS.forEach(ev => {
+    const row = el("div", "row", chart);
+    const label = el("div", "label", row);
+    const name = el("span", "name", label);
+    name.textContent = ev.name;
+    if (ev.note){
+      const note = el("span", "note", label);
+      note.textContent = ev.note;
+    }
+
+    const track = el("div", "track", row);
+    if (ev.end){
+      const bar = el("div", "bar" + (ev.cls ? " " + ev.cls : ""), track);
+      const l = pct(toDate(ev.start));
+      bar.style.left = l + "%";
+      bar.style.width = (pct(toDate(ev.end)) - l) + "%";
+      addTip(bar, ev.name, `${fmtDate(ev.start)} – ${fmtDate(ev.end)}`);
+    } else {
+      const pt = el("div", "point" + (ev.cls ? " " + ev.cls : ""), track);
+      pt.style.left = pct(toDate(ev.start)) + "%";
+    }
+  });
+
+  // Reference lines sit in an overlay aligned to the track column
+  const overlay = el("div", "", chart);
+  Object.assign(overlay.style, {
+    position: "absolute", top: "0", bottom: "0",
+    left: "var(--label-w)", right: "0", pointerEvents: "none"
+  });
+
+  const LABEL_TOP = 12;   // gap between chart bottom and the first label row
+  const LABEL_GAP = 6;    // space between stacked label rows
+  const LINE_GAP = 4;     // space between the end of a line and its label
+
+  function addLine(date, label, cls){
+    const p = pct(date);
+    if (p < 0 || p > 100) return;
+    const line = el("div", "vline" + (cls ? " " + cls : ""), overlay);
+    line.style.left = p + "%";
+    const t = el("div", "vline-label", line);
+    el("span", "date", t).textContent = `${MONTHS_LONG[date.getMonth()]} ${date.getDate()}`;
+    el("span", "", t).textContent = label;
+  }
+
+  LINES.forEach(l => addLine(toDate(l.date), l.label, l.cls));
+
+  // Stack labels into rows under the chart so none overlap
+  // Spell out months unless they would run into each other on a narrow screen
+  function fitMonths(){
+    const names = [...axisTrack.querySelectorAll(".mname")];
+    names.forEach(n => n.textContent = n.dataset.full);
+    const edge = axisTrack.getBoundingClientRect().right;
+    const crowded = names.some((n, i) => {
+      const r = n.getBoundingClientRect();
+      const next = names[i + 1];
+      return r.right + 4 > (next ? next.getBoundingClientRect().left : edge + 16);
+    });
+    if (crowded) names.forEach(n => n.textContent = n.dataset.short);
+  }
+
+  function placeLabels(){
+    fitMonths();
+    // lines start at the month axis rule instead of the top of the chart
+    overlay.style.top = axisRow.offsetHeight + "px";
+    grid.style.top = axisRow.offsetHeight + "px";
+    const labels = [...overlay.querySelectorAll(".vline-label")];
+    const rows = [];  // { right: right edge of last label, h: tallest label }
+    const edge = chart.getBoundingClientRect().right;
+    labels.forEach(t => {
+      t.parentElement.style.bottom = "0";
+      t.style.top = `calc(100% + ${LABEL_TOP}px)`;
+      // wrap labels that would run past the right edge of the chart
+      t.style.maxWidth = "";
+      const r = t.getBoundingClientRect();
+      if (r.right > edge) t.style.maxWidth = Math.max(40, edge - r.left) + "px";
+    });
+    const assigned = labels.map(t => {
+      const r = t.getBoundingClientRect();
+      let i = rows.findIndex(row => r.left > row.right + 8);
+      if (i === -1){ i = rows.length; rows.push({ right: 0, h: 0 }); }
+      rows[i].right = r.right;
+      rows[i].h = Math.max(rows[i].h, r.height);
+      return i;
+    });
+    const offsets = [];
+    rows.reduce((y, row, i) => (offsets[i] = y, y + row.h + LABEL_GAP), LABEL_TOP);
+    labels.forEach((t, k) => {
+      // extend the line down to its label, leaving a small gap
+      const line = t.parentElement;
+      line.style.bottom = -(offsets[assigned[k]] - LINE_GAP) + "px";
+      t.style.top = `calc(100% + ${LINE_GAP}px)`;
+    });
+    const total = rows.reduce((y, row) => y + row.h + LABEL_GAP, LABEL_TOP);
+    chart.style.marginBottom = (total + 8) + "px";
+  }
+  placeLabels();
+  window.addEventListener("resize", placeLabels);
+  document.fonts && document.fonts.ready.then(placeLabels);
+</script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Early Voting Periods</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    margin-bottom: 12px;
+    border-top: 3px solid #111;
+  }
+
+  /* legend + sort control in one row above the chart */
+  #controls{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 16px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  #legend{ display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  #legend .item{ display: flex; align-items: center; gap: 6px; }
+  #legend .swatch{ width: 14px; height: 10px; flex: none; }
+  #sort{ display: flex; align-items: center; gap: 6px; }
+  #sort button{
+    font: inherit;
+    font-size: 12px;
+    background: #fff;
+    color: #111;
+    border: 1px solid #111;
+    padding: 3px 8px;
+    cursor: pointer;
+  }
+  #sort button.on{ background: #111; color: #fff; }
+
+  #chart{
+    --label-w: 130px;
+    --pad: 48px;          /* room after Election Day for the last month name */
+    position: relative;
+  }
+  .row.state .days, .axis .track{ margin-right: var(--pad); }
+
+  .row{
+    display: grid;
+    grid-template-columns: var(--label-w) 1fr;
+    align-items: center;
+  }
+  .row.axis{ border-bottom: 1px solid #111; }
+  .row.state:hover .label{ font-family: "BentonStrong", system-ui, sans-serif; }
+
+  .label{
+    padding-right: 8px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* one column per day; a 1px gap separates the days */
+  .days{
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    column-gap: 1px;
+    height: 13px;
+    margin: 1px 0;
+  }
+  .cell{ background: #F2F2F2; }
+  .cell.on{ background: #FFD200; }
+  .cell.open{
+    background: repeating-linear-gradient(135deg, #FFD200 0 2px, #fff 2px 4px);
+  }
+  .row.state:hover .cell:not(.on):not(.open){ background: #E4E4E4; }
+
+  /* month names and weekly dates above the grid */
+  .axis .track{ position: relative; height: 34px; }
+  .month, .tick{
+    position: absolute;
+    white-space: nowrap;
+    line-height: 1;
+    padding-left: 3px;
+    border-left: 1px solid #111;
+  }
+  .month{ top: 0; font-family: "BentonStrong", system-ui, sans-serif; font-size: 12px; height: 14px; }
+  .tick{ bottom: 0; font-size: 11px; height: 14px; color: #111; }
+
+  /* Election Day line over the grid */
+  .vline{
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 2px dotted #111;
+    pointer-events: none;
+  }
+
+  #tip{
+    position: fixed;
+    z-index: 10;
+    display: none;
+    max-width: 280px;
+    background: #fff;
+    border: 1px solid #111;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  #tip .tipName{ font-family: "BentonStrong", system-ui, sans-serif; display: block; margin-bottom: 2px; }
+  #tip .k{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #tip .desc{ color: #555; }
+
+  #source{
+    font-size: 12px;
+    color: #555;
+    margin-top: 16px;
+    line-height: 1.4;
+  }
+  #source a{ color: #007194; text-decoration: none; }
+  #source a:hover{ text-decoration: underline; }
+
+  @media (max-width: 600px){
+    #chart{ --label-w: 110px; --pad: 36px; }
+    #title{ font-size: 16px; }
+    .label{ font-size: 11px; }
+    .days{ height: 11px; column-gap: 0; }
+    .month{ font-size: 11px; }
+    .tick{ font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div id="title">Early voting periods by state</div>
+
+  <div id="controls">
+    <div id="legend">
+      <div class="item"><span class="swatch" style="background:#FFD200"></span>Early in-person voting</div>
+      <div class="item"><span class="swatch" style="background:repeating-linear-gradient(135deg,#FFD200 0 2px,#fff 2px 4px)"></span>End date not specified</div>
+    </div>
+    <div id="sort">Sort:
+      <button type="button" data-sort="start" class="on">Start date</button>
+      <button type="button" data-sort="name">State</button>
+    </div>
+  </div>
+
+  <div id="chart"></div>
+
+  <div id="source"></div>
+</div>
+
+<script>
+  const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const MONTHS_SHORT = ["Jan.","Feb.","Mar.","Apr.","May","June","July","Aug.","Sept.","Oct.","Nov.","Dec."];
+  const ELECTION_DAY = new Date(2026, 10, 3);
+  const DAY = 864e5;
+
+  const parseDate = s => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((s || "").trim());
+    return m ? new Date(+m[1], m[2] - 1, +m[3]) : null;
+  };
+  const dayIndex = (d, start) => Math.round((d - start) / DAY);
+  const fmtDate = d => `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
+
+  const chart = document.getElementById("chart");
+  function el(tag, cls, parent){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Tooltip: hover a row, or tap it on touch screens
+  const tip = el("div", "", document.body);
+  tip.id = "tip";
+  function showTip(s, x, y){
+    tip.innerHTML = "";
+    el("span", "tipName", tip).textContent = s.name;
+    const line = (k, date, desc) => {
+      const d = el("div", "", tip);
+      el("span", "k", d).textContent = `${k}: `;
+      d.append(date ? fmtDate(date) : "Not specified");
+      if (desc) el("div", "desc", d).textContent = desc;
+    };
+    line("Begins", s.start, s.startDesc);
+    line("Ends", s.end, s.endDesc);
+    if (s.end) el("div", "", tip).textContent = `${dayIndex(s.end, s.start) + 1} days`;
+    tip.style.display = "block";
+    moveTip(x, y);
+  }
+  function moveTip(x, y){
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = x + 14, top = y + 14;
+    if (left + w > window.innerWidth - 8) left = x - w - 14;
+    if (left < 8) left = 8;
+    if (top + h > window.innerHeight - 8) top = y - h - 14;
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  const hideTip = () => { tip.style.display = "none"; };
+  document.addEventListener("click", hideTip);
+  window.addEventListener("scroll", hideTip, { passive: true });
+
+  fetch("early_voting_data.csv").then(r => r.text()).then(text => {
+    const rows = d3.csvParse(text);
+
+    // Source line lives in the last row of the sheet
+    const srcRow = rows.find(r => /^source/i.test((r["State/Territory"] || "").trim()));
+    const srcUrl = srcRow && Object.values(srcRow).find(v => /^https?:\/\//.test((v || "").trim()));
+    const src = document.getElementById("source");
+    if (srcUrl){
+      src.append("Source: ");
+      const a = el("a", "", src);
+      a.href = srcUrl.trim();
+      a.textContent = "National Conference of State Legislatures";
+      a.target = "_blank";
+      a.rel = "noopener";
+    }
+
+    const notes = el("div", "", src);
+    notes.textContent = "Alabama, Mississippi and New Hampshire are not listed in the source data.";
+
+    const states = rows
+      .map(r => ({
+        name: (r["State/Territory"] || "").trim(),
+        start: parseDate(r["Early Voting Begin Date"]),
+        end: parseDate(r["Early Voting End Date"]),
+        startDesc: (r["Early Voting Begins"] || "").trim(),
+        endDesc: (r["Early Voting Ends"] || "").trim(),
+      }))
+      .filter(s => s.name && s.start);
+
+    // Days shown: earliest start through Election Day
+    const first = d3.min(states, s => s.start);
+    const last = ELECTION_DAY;
+    const n = dayIndex(last, first) + 1;
+    chart.style.setProperty("--n", n);
+
+    // Axis: month names on top, a date every week (Mondays) below
+    const axisRow = el("div", "row axis", chart);
+    el("div", "label", axisRow);
+    const axisTrack = el("div", "track", axisRow);
+    const pct = d => (dayIndex(d, first) / n) * 100;
+    const monthEls = [], tickEls = [];
+    for (let d = new Date(first.getFullYear(), first.getMonth(), 1); d <= last; d.setMonth(d.getMonth() + 1)){
+      const at = d < first ? first : new Date(d);
+      const m = el("div", "month", axisTrack);
+      m.style.left = pct(at) + "%";
+      m.dataset.full = MONTHS_LONG[d.getMonth()];
+      m.dataset.short = MONTHS_SHORT[d.getMonth()];
+      monthEls.push(m);
+    }
+    for (let d = new Date(first); d <= last; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)){
+      if (d.getDay() !== 1) continue;
+      const t = el("div", "tick", axisTrack);
+      t.style.left = pct(d) + "%";
+      t.textContent = d.getDate();
+      tickEls.push(t);
+    }
+
+    // One row per state
+    const rowEls = states.map(s => {
+      const row = el("div", "row state");
+      el("div", "label", row).textContent = s.name;
+      const days = el("div", "days", row);
+      const a = dayIndex(s.start, first);
+      const b = s.end ? dayIndex(s.end, first) : n - 1;
+      for (let i = 0; i < n; i++){
+        const c = el("div", "cell", days);
+        if (i >= a && i <= b) c.classList.add(s.end ? "on" : "open");
+      }
+      row.addEventListener("mouseenter", e => showTip(s, e.clientX, e.clientY));
+      row.addEventListener("mousemove", e => moveTip(e.clientX, e.clientY));
+      row.addEventListener("mouseleave", hideTip);
+      row.addEventListener("click", e => { e.stopPropagation(); showTip(s, e.clientX, e.clientY); });
+      return { s, row };
+    });
+
+    // Election Day line, over the grid
+    const overlay = el("div", "", chart);
+    Object.assign(overlay.style, {
+      position: "absolute", bottom: "0", left: "var(--label-w)", right: "var(--pad)", pointerEvents: "none"
+    });
+    const line = el("div", "vline", overlay);
+    line.style.left = ((dayIndex(ELECTION_DAY, first) + 0.5) / n) * 100 + "%";
+
+    // Sorting
+    function render(by){
+      const sorted = rowEls.slice().sort(by === "name"
+        ? (x, y) => d3.ascending(x.s.name, y.s.name)
+        : (x, y) => (x.s.start - y.s.start) || ((x.s.end || ELECTION_DAY) - (y.s.end || ELECTION_DAY)) || d3.ascending(x.s.name, y.s.name));
+      sorted.forEach(r => chart.insertBefore(r.row, overlay));
+      document.querySelectorAll("#sort button").forEach(b => b.classList.toggle("on", b.dataset.sort === by));
+    }
+    document.querySelectorAll("#sort button").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      render(b.dataset.sort);
+    }));
+    render("start");
+
+    // Layout pass: spell out months unless crowded, drop weekly dates that collide
+    function layout(){
+      overlay.style.top = axisRow.offsetHeight + "px";
+      monthEls.forEach(m => m.textContent = m.dataset.full);
+      const edge = chart.getBoundingClientRect().right;
+      const crowded = monthEls.some((m, i) => {
+        const r = m.getBoundingClientRect();
+        const next = monthEls[i + 1];
+        return r.right + 4 > (next ? next.getBoundingClientRect().left : edge);
+      });
+      if (crowded) monthEls.forEach(m => m.textContent = m.dataset.short);
+      let lastRight = -Infinity;
+      tickEls.forEach(t => {
+        t.style.visibility = "";
+        const r = t.getBoundingClientRect();
+        if (r.left < lastRight + 3 || r.right > edge) t.style.visibility = "hidden";
+        else lastRight = r.right;
+      });
+    }
+    layout();
+    window.addEventListener("resize", layout);
+    document.fonts && document.fonts.ready.then(layout);
+  });
+</script>
+</body>
+</html>

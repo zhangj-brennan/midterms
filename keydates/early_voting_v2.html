@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Early Voting Overlap</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    margin-bottom: 4px;
+    border-top: 3px solid #111;
+  }
+  #subtitle{ font-size: 13px; line-height: 1.4; color: #555; margin-bottom: 14px; }
+
+  /* color scale legend, under the chart */
+  #legend{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    font-size: 12px;
+    margin-top: 0;      /* the chart reserves room for the marker labels */
+  }
+  #legend .legendTitle{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #legend .item{ display: flex; align-items: center; gap: 6px; }
+  #legend .swatch{ width: 14px; height: 10px; flex: none; background: #F2F2F2; }
+  #legend .ramp{ width: 140px; height: 10px; flex: none; }
+
+  #chart{
+    --pad: 48px;          /* room after Election Day for the last month name */
+    position: relative;
+  }
+
+  .axis{ position: relative; height: 34px; margin-right: var(--pad); border-bottom: 1px solid #111; }
+  .month, .tick{
+    position: absolute;
+    white-space: nowrap;
+    line-height: 1;
+    padding-left: 3px;
+    border-left: 1px solid #111;
+  }
+  .month{ top: 0; bottom: 0; font-family: "BentonStrong", system-ui, sans-serif; font-size: 12px; }
+  .tick{ bottom: 0; font-size: 11px; height: 14px; }
+
+  /* one column per day, shaded by how many states have early voting */
+  .days{
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    column-gap: 1px;
+    height: 48px;
+    margin: 2px var(--pad) 0 0;
+  }
+  .cell{ background: #F2F2F2; }
+  .cell:hover, .cell.active{ outline: 2px solid #111; outline-offset: -1px; position: relative; z-index: 1; }
+
+  /* Election Day line and label */
+  .vline{
+    position: absolute;
+    top: 0;
+    bottom: -8px;
+    border-left: 2px dotted #111;
+    pointer-events: none;
+  }
+  .vline-label{
+    position: absolute;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+  .vline-label .date{ display: block; font-family: "BentonStrong", system-ui, sans-serif; }
+
+  #tip{
+    position: fixed;
+    z-index: 10;
+    display: none;
+    max-width: 260px;
+    background: #fff;
+    border: 1px solid #111;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  #tip .tipName{ font-family: "BentonStrong", system-ui, sans-serif; display: block; }
+  #tip .desc{ color: #555; margin-top: 3px; }
+
+  #source{
+    font-size: 12px;
+    color: #555;
+    margin-top: 12px;
+    line-height: 1.4;
+  }
+  #source a{ color: #007194; text-decoration: none; }
+  #source a:hover{ text-decoration: underline; }
+
+  @media (max-width: 600px){
+    #chart{ --pad: 36px; }
+    #title{ font-size: 16px; }
+    .days{ height: 40px; column-gap: 0; }
+    .month{ font-size: 11px; }
+    .tick{ font-size: 10px; }
+    .vline-label{ font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div id="title">Number of States &amp; Territories With Early In-Person Voting Available</div>
+  <div id="subtitle">
+    <div>Each bar shows how many jurisdictions have in-person early voting open on that calendar date. Sept 4-Nov 3, 2026 | Out of 51 jurisdictions: 50 states, D.C., Guam, Puerto Rico, and the U.S.</div>
+  </div>
+
+  <div id="chart"></div>
+
+  <div id="legend"></div>
+
+  <div id="source"></div>
+</div>
+
+<script>
+  const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MONTHS_SHORT = ["Jan.","Feb.","Mar.","Apr.","May","June","July","Aug.","Sept.","Oct.","Nov.","Dec."];
+  const ELECTION_DAY = new Date(2026, 10, 3);
+  const DAY = 864e5;
+  const EMPTY = "#F2F2F2";
+  const LIGHT = "#F1DDF1", DARK = "#711471";   // brand purple, light to dark
+
+  const parseDate = s => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((s || "").trim());
+    return m ? new Date(+m[1], m[2] - 1, +m[3]) : null;
+  };
+  const dayIndex = (d, start) => Math.round((d - start) / DAY);
+  const fmtDate = d => `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
+  const plural = (k, word) => `${k} ${word}${k === 1 ? "" : "s"}`;
+
+  function el(tag, cls, parent){
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  const chart = document.getElementById("chart");
+
+  // Tooltip: hover a day, or tap it on touch screens
+  const tip = el("div", "", document.body);
+  tip.id = "tip";
+  let activeCell = null;
+  function showTip(cell, d, x, y){
+    tip.innerHTML = "";
+    el("span", "tipName", tip).textContent = `${WEEKDAYS[d.date.getDay()]}, ${fmtDate(d.date)}`;
+    el("div", "", tip).textContent = `${plural(d.count, "jurisdiction")} with early voting open`;
+    tip.style.display = "block";
+    moveTip(x, y);
+    if (activeCell && activeCell !== cell) activeCell.classList.remove("active");
+    activeCell = cell;
+    cell.classList.add("active");
+  }
+  function moveTip(x, y){
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = x + 14, top = y + 14;
+    if (left + w > window.innerWidth - 8) left = x - w - 14;
+    if (left < 8) left = 8;
+    if (top + h > window.innerHeight - 8) top = y - h - 14;
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function hideTip(){
+    tip.style.display = "none";
+    if (activeCell) activeCell.classList.remove("active");
+    activeCell = null;
+  }
+  document.addEventListener("click", hideTip);
+  window.addEventListener("scroll", hideTip, { passive: true });
+
+  const SOURCE_URL = "https://www.ncsl.org/elections-and-campaigns/early-in-person-voting";
+
+  fetch("early_voting_daily_totals.csv").then(r => r.text()).then(text => {
+    const rows = d3.csvParse(text);
+
+    const src = document.getElementById("source");
+    src.append("Source: ");
+    const a = el("a", "", src);
+    a.href = SOURCE_URL;
+    a.textContent = "National Conference of State Legislatures";
+    a.target = "_blank";
+    a.rel = "noopener";
+
+    // Daily counts, keyed by date
+    const COUNT_COL = "States/Territories with Early Voting Available";
+    const counts = new Map();
+    rows.forEach(r => {
+      const d = parseDate(r.Date);
+      const k = parseFloat(r[COUNT_COL]);
+      if (d && !isNaN(k)) counts.set(d.getTime(), Math.round(k));
+    });
+    const dates = [...counts.keys()].sort((x, y) => x - y);
+
+    // Days shown: first date with any early voting open (skipping the leading
+    // run of zeros) through Election Day
+    const first = new Date(dates.find(t => counts.get(t) > 0));
+    const n = dayIndex(ELECTION_DAY, first) + 1;
+    chart.style.setProperty("--n", n);
+
+    const days = d3.range(n).map(i => {
+      const date = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i);   // calendar days, safe across the clock change
+      return { date, count: counts.get(date.getTime()) ?? 0 };
+    });
+
+    const max = d3.max(days, d => d.count);
+    const color = d3.scaleLinear().domain([1, max]).range([LIGHT, DARK]).interpolate(d3.interpolateLab);
+    const fill = k => k === 0 ? EMPTY : color(k);
+
+    // Legend: gray for none, ramp from 1 to the max
+    const legend = document.getElementById("legend");
+    el("div", "legendTitle", legend).textContent = "Jurisdictions with early voting open";
+    if (days.some(d => d.count === 0)){
+      const none = el("div", "item", legend);
+      el("span", "swatch", none);
+      none.append("None");
+    }
+    const rampItem = el("div", "item", legend);
+    rampItem.append("1");
+    const ramp = el("span", "ramp", rampItem);
+    ramp.style.background = `linear-gradient(to right, ${color(1)}, ${color(max)})`;
+    rampItem.append(`${max}`);
+
+    // Axis: month names on top, a date every week (Mondays) below
+    const axis = el("div", "axis", chart);
+    const pct = d => (dayIndex(d, first) / n) * 100;
+    const monthEls = [], tickEls = [];
+    for (let d = new Date(first.getFullYear(), first.getMonth(), 1); d <= ELECTION_DAY; d.setMonth(d.getMonth() + 1)){
+      const at = d < first ? first : new Date(d);
+      const mdiv = el("div", "month", axis);
+      mdiv.style.left = pct(at) + "%";
+      const m = el("span", "mtext", mdiv);
+      m.dataset.full = MONTHS_LONG[d.getMonth()];
+      m.dataset.short = MONTHS_SHORT[d.getMonth()];
+      monthEls.push(m);
+    }
+    days.forEach(d => {
+      if (d.date.getDay() !== 1) return;
+      const t = el("div", "tick", axis);
+      t.style.left = pct(d.date) + "%";
+      t.textContent = d.date.getDate();
+      tickEls.push(t);
+    });
+
+    // The heatmap row
+    const row = el("div", "days", chart);
+    days.forEach(d => {
+      const c = el("div", "cell", row);
+      c.style.background = fill(d.count);
+      c.addEventListener("mouseenter", e => showTip(c, d, e.clientX, e.clientY));
+      c.addEventListener("mousemove", e => moveTip(e.clientX, e.clientY));
+      c.addEventListener("mouseleave", hideTip);
+      c.addEventListener("click", e => { e.stopPropagation(); showTip(c, d, e.clientX, e.clientY); });
+    });
+
+    // Marker lines over the row, each group labeled underneath:
+    // the day(s) with the most jurisdictions open, and Election Day
+    const overlay = el("div", "", chart);
+    Object.assign(overlay.style, { position: "absolute", left: "0", right: "var(--pad)", bottom: "0", pointerEvents: "none" });
+
+    const peakIdx = days.map((d, i) => d.count === max ? i : -1).filter(i => i >= 0);
+    const peakDates = (() => {
+      const ds = peakIdx.map(i => days[i].date);
+      const sameMonth = ds.every(d => d.getMonth() === ds[0].getMonth());
+      const parts = sameMonth ? ds.map((d, i) => i === 0 ? fmtDate(d) : String(d.getDate())) : ds.map(fmtDate);
+      return parts.length < 2 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+    })();
+    const MARKERS = [
+      { idx: peakIdx, date: peakDates, name: `Peak: ${max}` },
+      { idx: [n - 1], date: fmtDate(ELECTION_DAY), name: "Election Day" },
+    ];
+    MARKERS.forEach(m => {
+      m.lines = m.idx.map(i => {
+        const line = el("div", "vline", overlay);
+        line.style.left = ((i + 0.5) / n) * 100 + "%";
+        return line;
+      });
+      m.label = el("div", "vline-label", overlay);
+      el("span", "date", m.label).textContent = m.date;
+      el("span", "", m.label).textContent = m.name;
+    });
+    const LINE_GAP = 4, ROW_GAP = 6;
+
+    function layout(){
+      overlay.style.top = axis.offsetHeight + "px";
+
+      // Spell out months unless they would run into each other
+      monthEls.forEach(m => m.textContent = m.dataset.full);
+      const edge = chart.getBoundingClientRect().right;
+      const crowded = monthEls.some((m, i) => {
+        const r = m.getBoundingClientRect();
+        const next = monthEls[i + 1];
+        return r.right + 4 > (next ? next.getBoundingClientRect().left : edge);
+      });
+      if (crowded) monthEls.forEach(m => m.textContent = m.dataset.short);
+      const monthLines = monthEls.map(m => m.parentElement.getBoundingClientRect().left);
+      let lastRight = -Infinity;
+      tickEls.forEach(t => {
+        t.style.visibility = "";
+        const r = t.getBoundingClientRect();
+        const cut = monthLines.some(x => x > r.left + 1 && x < r.right);
+        if (cut || r.left < lastRight + 3 || r.right > edge) t.style.visibility = "hidden";
+        else lastRight = r.right;
+      });
+
+      // Marker labels sit under their lines. Election Day is placed first; the
+      // peak label tries centered, then ending at its lines, then starting at
+      // them, and only drops a row if none of those fit. No label may sit
+      // across another marker's line.
+      const w = row.getBoundingClientRect().width;
+      const ox = overlay.getBoundingClientRect().left;
+      const pageRight = document.documentElement.clientWidth - 4;
+      const top0 = row.offsetHeight + 8 + LINE_GAP;
+      const xs = m => m.idx.map(i => (i + 0.5) / n * w);
+      const placed = [];
+      let bottom = 0;
+      [...MARKERS].reverse().forEach(m => {
+        const lw = m.label.offsetWidth, lh = m.label.offsetHeight;
+        const mx = xs(m), lo = Math.min(...mx), hi = Math.max(...mx), cx = (lo + hi) / 2;
+        const others = MARKERS.filter(o => o !== m).flatMap(xs);
+        const fit = x => Math.max(-ox, Math.min(x, pageRight - ox - lw));
+        const options = [
+          { left: fit(cx - lw / 2), align: "center" },
+          { left: fit(hi + 4 - lw), align: "right" },
+          { left: fit(lo - 4), align: "left" },
+        ];
+        const clear = (o, y) =>
+          !placed.some(p => o.left < p.right + 8 && p.left < o.left + lw + 8 && y < p.bottom && p.top < y + lh) &&
+          !others.some(x => x > o.left - 2 && x < o.left + lw + 2);
+        let y = top0, pick = options.find(o => clear(o, y));
+        while (!pick){
+          y = Math.max(...placed.map(p => p.bottom)) + ROW_GAP;
+          pick = options.find(o => clear(o, y)) || (y > 400 ? options[0] : null);
+        }
+        m.label.style.left = pick.left + "px";
+        m.label.style.top = y + "px";
+        m.label.style.textAlign = pick.align;
+        m.lines.forEach(l => l.style.bottom = -(y - row.offsetHeight - LINE_GAP) + "px");
+        placed.push({ left: pick.left, right: pick.left + lw, top: y, bottom: y + lh });
+        bottom = Math.max(bottom, y + lh);
+      });
+      chart.style.marginBottom = (bottom - row.offsetHeight + 12) + "px";
+    }
+    layout();
+    window.addEventListener("resize", layout);
+    document.fonts && document.fonts.ready.then(layout);
+  });
+</script>
+</body>
+</html>
