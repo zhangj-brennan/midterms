@@ -288,10 +288,24 @@
     function layout(){
       const size = cal.querySelector(".day").getBoundingClientRect().width;
       cal.style.setProperty("--num-size", Math.max(8, Math.min(16, Math.round(size * 0.42))) + "px");
+      if (window.sendEmbedHeight) window.sendEmbedHeight();
     }
     layout();
     window.addEventListener("resize", layout);
   });
+</script>
+<script>
+  // Tell an embedding page how tall this page is, so it can size its iframe to fit (see README-embedding.md).
+  (function () {
+    if (window.parent === window) return;
+    const sendHeight = () => {
+      const height = Math.ceil(document.body.getBoundingClientRect().bottom + window.scrollY);
+      window.parent.postMessage({ type: "keydates-ev-calendar-height", height }, "*");
+    };
+    window.sendEmbedHeight = sendHeight;  // the calendar also calls this once it's drawn
+    new ResizeObserver(sendHeight).observe(document.body);
+    window.addEventListener("load", sendHeight);
+  })();
 </script>
 </body>
 </html>
