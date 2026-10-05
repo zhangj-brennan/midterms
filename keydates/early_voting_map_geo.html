@@ -29,18 +29,6 @@
     margin: 0 auto;
   }
 
-  /* opening / closing toggle, just above the title's top rule on the right */
-  #toolbar{ display: flex; justify-content: flex-end; margin-bottom: 6px; }
-  #modeToggle{
-    font: inherit;
-    font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 12px;
-    border: 1px solid #111;
-    background: #fff;
-    padding: 3px 10px;
-    cursor: pointer;
-  }
-  #modeToggle:hover{ background: #111; color: #fff; }
 
   #title{
     font-family: "BentonStrong", system-ui, sans-serif;
@@ -91,7 +79,7 @@
   .state:hover .abbr.onDark{ fill: var(--tile-color); }
   /* tile fills are set in the script for the current mode (fillOf); no early in-person voting keeps a grey edge */
   .state.none .tile{ stroke: #DCDCDC; }
-  .state.none .abbr{ fill: #999; }
+  .label.none .abbr{ fill: #999; }
   .state.none{ cursor: default; }
 
   .legend{
@@ -214,7 +202,6 @@
 <div id="wrapper">
   <div id="testBanner">FOR TESTING ONLY DO NOT SHARE</div>
   <div class="panel">
-      <div id="toolbar"><button id="modeToggle" type="button">Show closing</button></div>
       <div id="title">Early In-Person Voting Currently Open</div>
       <div class="subtitle">Hover over a state to see its early voting period.</div>
       <div id="mapLegend" class="legend"></div>
@@ -291,14 +278,14 @@ rows.forEach(r => {
   };
 });
 
-/* Two modes, switched by the toggle above the title (?mode=closing opens in closing mode):
+/* Two modes. This version shows opening only (no opening / closing toggle); closing is kept from early_voting_map.html:
    opening: open states green; not yet open by days until their first day, in five-day steps
             (next 5 days, 6–10, 11–15, 16+), yellow to pale yellow; ended grey.
    closing: open states by days until their last day, red to pale red. The red starts at the earliest
             closing date among open states and runs to the latest, split into three equal steps of days
             (fewer if the dates span fewer than three days). Not yet open: grey; ended: lighter grey.
    In opening mode, only the steps that still fit before Election Day are shown in the legend. */
-let MODE = new URLSearchParams(location.search).get("mode") === "closing" ? "closing" : "opening";
+const MODE = "opening";
 const GREEN = "#5BB974", YELLOW = "#FFD200", PALE_YELLOW = "#FFF5C7", RED = "#C8102E", PALE_RED = "#FADADF";
 const GREY = "#DCDCDC", TBD_GREY = "#ABABAB", NOT_OPEN_GREY = "#BDBDBD";
 // closing mode: states whose early voting hasn't ended but that have no closing date in the CSV (Missouri)
@@ -538,7 +525,8 @@ function drawMap(){
     p.append("rect").attr("width", 4).attr("height", 8).attr("fill", c);
   });
 
-  const state = svg.selectAll(".state")
+  // shapes in their own group, so raising a hovered shape keeps it below the labels layer
+  const state = svg.append("g").attr("class", "shapes").selectAll(".state")
     .data(GRID_STATES, d => d.name)
     .enter()
     .append("g")
@@ -723,11 +711,9 @@ const TITLES = { opening: "Early In-Person Voting Currently Open", closing: "Ear
 function render(){
   highlight(null);
   d3.select("#title").text(TITLES[MODE]);
-  d3.select("#modeToggle").text(MODE === "opening" ? "Show closing" : "Show opening");
   drawLegend();
   drawMap();
 }
-d3.select("#modeToggle").on("click", () => { MODE = MODE === "opening" ? "closing" : "opening"; render(); });
 render();
 loadGeo();
 
