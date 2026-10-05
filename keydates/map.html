@@ -63,10 +63,8 @@
   .state text{ fill: #111; }
   .state:hover rect.tile{ stroke: #FFD200; stroke-width: 4; }
   /* states with a key date today */
-  .state.soon rect.tile{ fill: url(#soonSplit); }
   .state.today rect.tile{ fill: #FFD200; }
   #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
-  #mapLegend .swatch.soonState{ background: linear-gradient(to bottom right, #DCDCDC 50%, #FFD200 50%); border: none; }
 
 
   #mapLegend{
@@ -120,7 +118,7 @@
   #tooltip .what{ font-family: "BentonMedium", system-ui, sans-serif; }
   /* state popup: only the date headings stay bold */
   #tooltip.statePopup h2, #tooltip.statePopup .what{ font-family: "Benton", system-ui, sans-serif; }
-  /* except the in-person early voting lines, in red */
+  /* except the in-person early voting begins lines, in red */
   #tooltip.statePopup .what.earlyVoting{ font-family: "BentonStrong", system-ui, sans-serif; color: #C8102E; }
   #tooltip h3 .countdown{ background: #FFD200; padding: 1px 5px; margin-left: 6px; }
   #tooltip h3.past{ color: #888; text-decoration: line-through; }
@@ -175,7 +173,7 @@ HI AK    TX             FL
      1. loadStateDates() (load_state_dates.js) turns CSV rows into one record per state.
      2. stateKeyDates()  (map_logic.js) turns a state's record into the lines of its hover popup (nearly every row).
      3. buildEvents()    (map_logic.js) turns every state's record into one-date-per-type events; the tile
-                         shading and the "Today" / "Up next" legend come only from these.
+                         shading and the "Today" legend come only from these.
    mapcheck.html runs the same map_logic.js on the same CSV and lists the result next to each CSV row.
    So a date can be in the CSV and in the popup but not drive the shading (see buildEvents for the rules). */
 // key dates by state, from state_dates_2026.csv (module script, so top-level await works)
@@ -193,7 +191,6 @@ const CONFIG = {
 const fmtShort = d3.timeFormat("%B %-d");      // October 5
 const fmtLong  = d3.timeFormat("%A, %B %-d");  // Monday, October 5
 const parse    = d3.timeParse("%Y-%m-%d");
-const short = iso => fmtShort(parse(iso));
 const long  = iso => fmtLong(parse(iso));
 
 /* Spell out the source's abbreviated dates and weekdays: "Sun Oct 25" -> "Sunday, October 25",
@@ -260,12 +257,6 @@ function drawMap(){
     .attr("role", "img")
     .attr("aria-label", "Tile map of U.S. states");
 
-  // tile split corner to corner, grey top-left and yellow bottom-right, for states with a key date coming up soon
-  const split = svg.append("defs").append("linearGradient")
-    .attr("id", "soonSplit").attr("x1", 0).attr("y1", 0).attr("x2", 1).attr("y2", 1);
-  [["50%", "#DCDCDC"], ["50%", "#FFD200"]].forEach(([o, c]) =>
-    split.append("stop").attr("offset", o).attr("stop-color", c));
-
   const state = svg.selectAll(".state")
     .data(GRID_STATES, d => d.name)
     .enter()
@@ -302,30 +293,6 @@ function drawMap(){
       const line = txt.append("span").attr("class", "upNext");
       line.append("span").attr("class", "when").text(`${t}: `);
       line.append("span").text(list.join(", "));
-    });
-  }
-
-  // half-yellow tiles for the next upcoming instance of each deadline type after today, through Election Day:
-  // for each type, find the first date after today that has any event of that type, and list every
-  // state with that type on that date (states already yellow for today stay fully yellow)
-  const upcoming = [...EVENTS_BY_DATE.keys()].filter(iso => iso > TODAY && iso <= ELECTION_DAY).sort();
-  const upNext = EVENT_TYPES.filter(t => t !== "Election Day").map(t => {
-    const date = upcoming.find(iso => eventsOn(iso).some(e => e.type === t));
-    if (!date) return null;
-    const evs = eventsOn(date).filter(e => e.type === t);
-    return { date, head: `Next ${t.charAt(0).toLowerCase() + t.slice(1)}, ${short(date)}: `, text: todayByType(evs, true)[0][1].join(", "), evs };
-  }).filter(Boolean).sort((a, b) => d3.ascending(a.date, b.date));
-  const soonStates = new Set(upNext.flatMap(u => u.evs.map(e => e.state)));
-  state.classed("soon", d => soonStates.has(d.name) && !todayStates.has(d.name));
-  if (upNext.length) {
-    const it = d3.select("#mapLegend").append("div").attr("class", "item");
-    it.append("span").attr("class", "swatch soonState");
-    const txt = it.append("span");
-    txt.append("span").attr("class", "type").text("Up next:");
-    upNext.forEach(u => {
-      const line = txt.append("span").attr("class", "upNext");
-      line.append("span").attr("class", "when").text(u.head);
-      line.append("span").text(u.text);
     });
   }
 
@@ -391,14 +358,14 @@ function renderPopup(abbr){
 /* stateKeyDates() — which CSV rows become which popup lines — is in map_logic.js. */
 function addKeyDate(ul, e){
   const li = ul.append("li");
-  li.append("span").attr("class", "what").classed("earlyVoting", /^In-person early voting (begins|ends)$/.test(e.what)).text(e.what);
+  li.append("span").attr("class", "what").classed("earlyVoting", e.what === "In-person early voting begins").text(e.what);
   const bits = [e.how, e.text].filter(Boolean);
   if (bits.length) li.append("span").attr("class", "how").text(" — " + sentenceCase(spellDates(bits.join(", "))));
   if (e.note) li.append("span").attr("class", "note").text(sentenceCase(spellDates(e.note), true));
 }
 
 /* EVENT_TYPES and buildEvents() — the one-date-per-type events behind the shading — are in map_logic.js. */
-// events indexed by ISO date ("2026-10-05" -> [events]) for the today / up-next lookups
+// events indexed by ISO date ("2026-10-05" -> [events]) for the today lookups
 const EVENTS_BY_DATE = d3.group(buildEvents(STATE_DATES, ELECTION_DAY), d => d.date);
 const fmtISO = d3.timeFormat("%Y-%m-%d");
 
@@ -426,7 +393,7 @@ drawMap();
 
 /* When embedded in an iframe, tell the parent page how tall the content is, so the embed snippet
    (README-embedding.md) can size the iframe to fit. The height changes day to day with the length of
-   the "Today" / "Up next" legend, and after web fonts load, so re-send it whenever the content resizes. */
+   the "Today" legend, and after web fonts load, so re-send it whenever the content resizes. */
 if (window.parent !== window) {
   const wrapper = document.getElementById("wrapper");
   const sendHeight = () => {

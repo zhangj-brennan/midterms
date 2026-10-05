@@ -125,10 +125,13 @@ function buildEvents(stateDates, electionDay){
     const emerg = (s.mailRequest || []).filter(i => i.end).sort((a, b) => d3.ascending(a.end, b.end));
     if (emerg.length) add(emerg[emerg.length - 1].end, "Emergency ballot period ends", abbr, undefined, [emerg[emerg.length - 1].csv]);
 
-    // Early voting begins / ends: the EARLIEST start and the LATEST end across all early-voting rows
-    // (a state can list several windows, e.g. early voting and in-person absentee voting).
-    const starts = (s.earlyVoting || []).filter(i => i.start).sort((a, b) => d3.ascending(a.start, b.start));
-    const ends = (s.earlyVoting || []).filter(i => i.end).sort((a, b) => d3.ascending(a.end, b.end));
+    // Early voting begins / ends: the EARLIEST start and the LATEST end across the rows labeled "Early Voting".
+    // A state can also list in-person absentee windows; those are used only when it has no dated "Early Voting" row.
+    const evDated = (s.earlyVoting || []).filter(i => i.start || i.end);
+    const ev = evDated.filter(i => /^early voting$/i.test(i.label || "Early voting"));
+    const evRows = ev.length ? ev : evDated;
+    const starts = evRows.filter(i => i.start).sort((a, b) => d3.ascending(a.start, b.start));
+    const ends = evRows.filter(i => i.end).sort((a, b) => d3.ascending(a.end, b.end));
     if (starts.length) add(starts[0].start, "In-person early voting begins", abbr, undefined, [starts[0].csv]);
     if (ends.length) add(ends[ends.length - 1].end, "In-person early voting ends", abbr, undefined, [ends[ends.length - 1].csv]);
 

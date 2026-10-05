@@ -78,10 +78,10 @@
     CSV, so it can't drift from the map. Line numbers are lines in <code>state_dates_2026.csv</code>.</p>
   <p>The map uses the data in two ways:</p>
   <ul>
-    <li><b>Tile shading and the "Today" / "Up next" legend</b> use at most <b>one date per state per deadline type</b>:
+    <li><b>Tile shading and the "Today" legend</b> use at most <b>one date per state per deadline type</b>:
       registration deadlines from VOTE411 (Election Day dates left out); the <b>latest</b> same-day registration end
       (Election Day left out); the <b>first</b> dated mail ballot request row; the <b>latest</b> emergency ballot period end;
-      the <b>earliest</b> early voting start and <b>latest</b> end; the <b>latest</b> non-postmark ballot return date; and the first
+      the <b>earliest</b> early voting start and <b>latest</b> end (from "Early Voting" rows; in-person absentee rows only when a state has none); the <b>latest</b> non-postmark ballot return date; and the first
       "Postmarked" return row.</li>
     <li><b>The hover popup</b> shows nearly every row, except U.S. Vote Foundation registration rows other than
       same-day / Election Day registration (VOTE411's by-method dates are shown instead).</li>
