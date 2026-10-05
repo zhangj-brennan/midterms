@@ -118,7 +118,7 @@
   #tooltip .what{ font-family: "BentonMedium", system-ui, sans-serif; }
   /* state popup: only the date headings stay bold */
   #tooltip.statePopup h2, #tooltip.statePopup .what{ font-family: "Benton", system-ui, sans-serif; }
-  /* except the in-person early voting begins lines, in red */
+  /* except the in-person early voting / absentee voting begins lines, in red */
   #tooltip.statePopup .what.earlyVoting{ font-family: "BentonStrong", system-ui, sans-serif; color: #C8102E; }
   #tooltip h3 .countdown{ background: #FFD200; padding: 1px 5px; margin-left: 6px; }
   #tooltip h3.past{ color: #888; text-decoration: line-through; }
@@ -335,8 +335,8 @@ function renderPopup(abbr){
         .text(n === 0 ? "Today" : `In ${n} day${n === 1 ? "" : "s"}`);
     }
     const ul = panel.append("ul");
-    // Election Day leads its date, then in-person early voting; repeats of the same deadline merge into one line
-    const rank = what => what === "Election Day" ? 0 : /early voting/i.test(what) ? 1 : 2;
+    // Election Day leads its date, then in-person early voting, then in-person absentee voting; repeats of the same deadline merge into one line
+    const rank = what => what === "Election Day" ? 0 : /early voting/i.test(what) ? 1 : /absentee voting/i.test(what) ? 2 : 3;
     d3.groups(evs, e => e.what)
       .sort(([a], [b]) => rank(a) - rank(b))
       .forEach(([what, rows]) => addKeyDate(ul, {
@@ -358,7 +358,7 @@ function renderPopup(abbr){
 /* stateKeyDates() — which CSV rows become which popup lines — is in map_logic.js. */
 function addKeyDate(ul, e){
   const li = ul.append("li");
-  li.append("span").attr("class", "what").classed("earlyVoting", e.what === "In-person early voting begins").text(e.what);
+  li.append("span").attr("class", "what").classed("earlyVoting", /^In-person (early|absentee) voting begins$/.test(e.what)).text(e.what);
   const bits = [e.how, e.text].filter(Boolean);
   if (bits.length) li.append("span").attr("class", "how").text(" — " + sentenceCase(spellDates(bits.join(", "))));
   if (e.note) li.append("span").attr("class", "note").text(sentenceCase(spellDates(e.note), true));

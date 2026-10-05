@@ -73,10 +73,6 @@
   #conflicts tr:hover td{ background: none; }
   #conflicts b{ font-family: "BentonStrong", system-ui, sans-serif; font-weight: normal; }
   #conflicts td.st{ font-family: "BentonStrong", system-ui, sans-serif; white-space: nowrap; }
-  #checkStatus{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 13px; margin-bottom: 10px; }
-  /* hand-check column */
-  td.check{ white-space: nowrap; color: #2E6B2E; font-family: "BentonStrong", system-ui, sans-serif; }
-  tr.checked td{ background: #EEF6EE; }
   /* internal-only warning bar */
   #testBanner{
     background: #C8102E;
@@ -126,7 +122,6 @@
   </table>
 </div>
 
-<div id="checkStatus"></div>
 <div id="tableWrap"><table><thead></thead><tbody></tbody></table></div>
 
 <a id="download" href="state_dates_2026.csv" download>Download CSV</a>
@@ -145,8 +140,7 @@ const COLUMNS = [
   ["Note",        r => r.note],
   ["Conflict / resolution", r => r.conflict_note, "conflict"],
   ["Where on the source page", r => whereOnPage(r), "where"],
-  ["Source",      null, "source"],
-  ["Hand-checked by Jia", r => r.checked_by_jia ? `✓ ${r.checked_by_jia}` : "", "check"]
+  ["Source",      null, "source"]
 ];
 
 // U.S. Vote Foundation section heading for each CSV category
@@ -205,10 +199,6 @@ d3.csv("state_dates_2026.csv").then(rows => {
   });
 
   const deadline = tr.filter(r => r.category !== "Official source");
-  // hand-check dates come from the CSV's checked_by_jia column
-  const checkable = rows.filter(r => r.category !== "Official source");
-  d3.select("#checkStatus").text(`Hand-checked by Jia: ${checkable.filter(r => r.checked_by_jia).length} of ${checkable.length} rows`);
-  deadline.classed("checked", r => !!r.checked_by_jia);
   COLUMNS.forEach(([name, get, cls]) => {
     const td = deadline.append("td").attr("class", cls || null);
     if (get) td.text(get);
