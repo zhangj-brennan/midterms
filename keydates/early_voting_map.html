@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Early Voting Today</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    border-top: 3px solid black;
+  }
+
+  .subtitle{
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  #map svg{
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .state{ cursor: pointer; }
+  .state text{
+    text-anchor: middle;
+    user-select: none;
+    pointer-events: none;
+  }
+  .state .abbr{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    fill: #111;
+  }
+  .state rect.tile{ fill: #DCDCDC; stroke: #fff; stroke-width: 2; }
+  /* hover: the tile turns black and its letters take the tile's own color (--tile-color, set in the script) */
+  .state:hover rect.tile{ fill: #111 !important; }
+  .state:hover .abbr{ fill: var(--tile-color); }
+  /* open now: green; not yet open: yellow by first day (startColor, in the script); ended: grey */
+  .state.open rect.tile{ fill: #5BB974; }
+  /* open, but the source gives no end date */
+  .state.openNoEnd rect.tile{ fill: url(#noEndStripes); }
+  /* no early in-person voting */
+  .state.none rect.tile{ fill: #fff; stroke: #DCDCDC; stroke-width: 2; }
+  .state.none .abbr{ fill: #999; }
+  .state.none{ cursor: default; }
+
+  .legend{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+  }
+  #mapLegend{ margin-bottom: 24px; }
+  /* "No early in-person voting", under the map */
+  #mapNote{ margin-top: 12px; }
+  #mapNote .list{ display: inline; margin-left: 4px; }
+  .legend .item{ display: flex; gap: 5px; align-items: flex-start; line-height: 1.35; }
+  .legend .swatch{ width: 12px; height: 12px; flex: none; margin-top: 2px; background: #DCDCDC; }
+  .legend .swatch.open{ background: #5BB974; }
+  .legend .swatch.openNoEnd{ background: repeating-linear-gradient(135deg, #5BB974 0 2px, #fff 2px 4px); }
+  /* the four first-day ranges, yellow (soonest) to pale yellow */
+  .legend .buckets{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 2px; }
+  .legend .bucket{ display: flex; gap: 5px; align-items: center; }
+  .legend .bucket .swatch{ margin-top: 0; }
+  .legend .swatch.none{ background: #fff; border: 1px solid #DCDCDC; }
+  .legend .type{ font-family: "BentonStrong", system-ui, sans-serif; }
+  .legend .list{ display: block; margin-top: 2px; }
+  /* clickable keys: highlight their states on the map */
+  .legend .key{ cursor: default; }
+  .legend .key:hover .swatch, .legend .key:focus-visible .swatch{ outline: 2px solid #111; outline-offset: 1px; }
+  .legend .key:focus{ outline: none; }
+  .legend.filtering .key{ opacity: .4; }
+  .legend.filtering .key.active{ opacity: 1; }
+  .state{ transition: opacity .15s; }
+  #map.filtering .state:not(.match){ opacity: .15; }
+
+  /* hover popup with a state's early voting period */
+  #tooltip{
+    position: fixed;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid #111;
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    padding: 10px 12px;
+    font-size: 12px;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    display: none;
+    z-index: 10;
+  }
+  #tooltip h2{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 17px;
+    margin: 0 0 4px;
+  }
+  #tooltip h3{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 12px;
+    margin: 9px 0 2px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #ddd;
+  }
+  #tooltip p{ margin: 0; line-height: 1.3; }
+  #tooltip p.date{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #tooltip .countdown{ display: inline-block; background: #FFD200; padding: 1px 5px; }
+
+  #footer{ margin-top: 20px; font-size: 12px; color: #000; }
+  #footer a{ color: #007194; text-decoration: none; }
+  #footer a:hover{ text-decoration: underline; }
+  #footer .label{ font-family: "BentonStrong", system-ui, sans-serif; color: #000; }
+
+  @media (max-width: 700px){
+    body{ padding: 10px; }
+  }
+</style>
+</head>
+
+<body>
+<div id="wrapper">
+  <div class="panel">
+      <div id="title">Early In-Person Voting Currently Open</div>
+      <div class="subtitle">Hover over a state to see its early voting period.</div>
+      <div id="mapLegend" class="legend"></div>
+      <div id="map"></div>
+      <div id="mapNote" class="legend"></div>
+  </div>
+
+  <div id="footer">
+    <span class="label">Source:</span> NOTE THIS IS DEREK TISLER SPREADSHEET
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Same tile layout as map.html -->
+<script id="grid" type="text/plain">
+                              ME
+               WI          VT NH
+WA ID MT ND MN IL MI    NY MA
+OR NV WY SD IA IN OH PA NJ CT RI
+CA UT CO NE MO KY WV VA MD DE
+   AZ NM KS AR TN NC SC    DC
+         OK LA MS AL GA
+HI AK    TX             FL
+</script>
+
+<script type="module">
+const ELECTION_DAY = "2026-11-03";
+// ?today=YYYY-MM-DD overrides the viewer's clock, as on map.html
+const TODAY_PARAM = new URLSearchParams(location.search).get("today");
+const TODAY = /^\d{4}-\d{2}-\d{2}$/.test(TODAY_PARAM || "") ? TODAY_PARAM : d3.timeFormat("%Y-%m-%d")(new Date());
+const CONFIG = { tileSize: 58, tileGapFactor: 1.08 };
+
+const STATE_NAMES = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado",
+  CT: "Connecticut", DE: "Delaware", DC: "District of Columbia", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky",
+  LA: "Louisiana", ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire",
+  NJ: "New Jersey", NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota",
+  OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island",
+  SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
+};
+const ABBR_BY_NAME = new Map(Object.entries(STATE_NAMES).map(([a, n]) => [n, a]));
+
+const fmtShort = d3.timeFormat("%B %-d");      // October 5
+const fmtLong  = d3.timeFormat("%A, %B %-d");  // Monday, October 5
+const parse    = d3.timeParse("%Y-%m-%d");
+const short = iso => fmtShort(parse(iso));
+const long  = iso => fmtLong(parse(iso));
+const daysBetween = (a, b) => d3.timeDay.count(parse(a), parse(b));
+
+/* One record per state from early_voting_data.csv. States not in the CSV (Alabama, Mississippi,
+   New Hampshire) have no early in-person voting. A missing end date (Missouri: "Not specified.")
+   is treated as open from the start date on, through the day before Election Day. */
+const rows = await d3.csv("early_voting_data.csv");
+const EV = {};
+rows.forEach(r => {
+  const abbr = ABBR_BY_NAME.get((r["State/Territory"] || "").trim());
+  if (!abbr) return; // blank and "Source:" rows at the bottom
+  EV[abbr] = {
+    start: r["Early Voting Begin Date"] || null,
+    end: r["Early Voting End Date"] || null,
+    row: r  // the full CSV row, shown as written in the popup
+  };
+});
+
+/* States not yet open are colored by how many days until their first day, in five-day steps:
+   the next 5 days (full yellow), 6–10, 11–15, and 16 or more (pale yellow). Only the steps that
+   still fit before Election Day are shown in the legend. */
+const GREEN = "#5BB974", YELLOW = "#FFD200", PALE_YELLOW = "#FFF5C7";
+const STEP = 5;
+const BUCKET_COLORS = d3.quantize(d3.interpolateLab(YELLOW, PALE_YELLOW), 4);
+const bucketOf = iso => Math.max(0, Math.min(3, Math.floor((daysBetween(TODAY, iso) - 1) / STEP)));
+const startColor = iso => BUCKET_COLORS[bucketOf(iso)];
+const DAYS_LEFT = daysBetween(TODAY, ELECTION_DAY);
+const BUCKETS = [
+  { label: `Next ${STEP} days` },
+  { label: `${STEP + 1}–${2 * STEP} days` },
+  { label: `${2 * STEP + 1}–${3 * STEP} days` },
+  { label: `${3 * STEP + 1}+ days` }
+].map((b, i) => ({ ...b, color: BUCKET_COLORS[i] }))
+  .filter((b, i) => i * STEP + 1 <= DAYS_LEFT);
+
+// "open" (in the period today), "openNoEnd" (started, no end date given), "before", "after", "none"
+function statusOf(abbr){
+  const e = EV[abbr];
+  if (!e || !e.start) return "none";
+  if (TODAY < e.start) return "before";
+  if (!e.end) return TODAY < ELECTION_DAY ? "openNoEnd" : "after";
+  return TODAY <= e.end ? "open" : "after";
+}
+
+function parseStateGridText(gridText){
+  const states = [];
+  gridText.split("\n").forEach((line, i) => {
+    const re = /\w+/g;
+    let m;
+    while ((m = re.exec(line))) states.push({ name: m[0], x: m.index / 3, y: i });
+  });
+  return states;
+}
+const GRID_STATES = parseStateGridText(document.getElementById("grid").textContent)
+  .filter(d => STATE_NAMES[d.name]);
+const minY = d3.min(GRID_STATES, d => d.y), minX = d3.min(GRID_STATES, d => d.x);
+GRID_STATES.forEach(d => { d.y -= minY; d.x -= minX; d.status = statusOf(d.name); });
+
+/* Legend keys -> the states they stand for. "open" includes Missouri (open, no end date), since the
+   "Currently open" count does; the five-day steps are "bucket0".."bucket3". */
+function keysOf(abbr){
+  const status = statusOf(abbr);
+  if (status === "open") return ["open"];
+  if (status === "openNoEnd") return ["open", "openNoEnd"];
+  if (status === "before") return ["bucket" + bucketOf(EV[abbr].start)];
+  return [status];
+}
+let activeKey = null;
+// highlight one key's states (null clears it)
+function highlight(key){
+  activeKey = key;
+  d3.selectAll(".legend").classed("filtering", !!activeKey);
+  d3.selectAll(".legend .key").classed("active", function(){ return this.dataset.key === activeKey; });
+  d3.select("#map").classed("filtering", !!activeKey);
+  d3.selectAll(".state").classed("match", d => !!activeKey && keysOf(d.name).includes(activeKey));
+}
+/* Make a legend element a key: hovering it (or focusing it with the keyboard) highlights its states.
+   Touch screens have no hover, so there a tap toggles the highlight instead. */
+function asKey(sel, key){
+  sel.classed("key", true).attr("data-key", key).attr("tabindex", 0)
+    .on("pointerenter", e => { if (e.pointerType === "mouse") highlight(key); })
+    .on("pointerleave", e => { if (e.pointerType === "mouse" && activeKey === key) highlight(null); })
+    .on("focus", () => highlight(key))
+    .on("blur", () => { if (activeKey === key) highlight(null); })
+    .on("click", e => {
+      if (e.pointerType === "mouse") return;
+      e.stopPropagation();
+      highlight(activeKey === key ? null : key);
+    });
+}
+// on touch screens, tapping anywhere but a key or a state clears the highlight
+document.addEventListener("click", e => {
+  if (activeKey && !e.target.closest(".key, .state")) highlight(null);
+});
+
+/* ---------- legend ---------- */
+function drawLegend(){
+  const legend = d3.select("#mapLegend");
+  const byName = abbrs => abbrs.map(a => STATE_NAMES[a]).sort((a, b) => a.localeCompare(b));
+  const all = Object.keys(STATE_NAMES);
+  const open = all.filter(a => statusOf(a) === "open");
+  const openNoEnd = all.filter(a => statusOf(a) === "openNoEnd");
+  const item = (key, cls, head, list, into = legend) => {
+    const it = into.append("div").attr("class", "item");
+    it.append("span").attr("class", "swatch " + cls);
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text(head);
+    if (list) txt.append("span").attr("class", "list").text(list);
+    asKey(it, key);
+  };
+
+  const nOpen = open.length + openNoEnd.length;
+  item("open", "open", `${nOpen === 0 ? "No states are" : nOpen === 1 ? "1 state is" : `${nOpen} states are`} open today, ${long(TODAY)}`);
+  if (openNoEnd.length) item("openNoEnd", "openNoEnd", "Open, end date not specified:", byName(openNoEnd).join(", "));
+
+  // not yet open: five-day steps by first day
+  const before = all.filter(a => statusOf(a) === "before");
+  if (before.length) {
+    const it = legend.append("div").attr("class", "item");
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text("Opening in:");
+    const buckets = txt.append("span").attr("class", "buckets");
+    BUCKETS.forEach((b, i) => {
+      const k = buckets.append("span").attr("class", "bucket");
+      asKey(k, "bucket" + i);
+      k.append("span").attr("class", "swatch").style("background", b.color);
+      k.append("span").text(b.label);
+    });
+  }
+  const ended = all.filter(a => statusOf(a) === "after");
+  if (ended.length) item("after", "", `Ended (${ended.length}):`, byName(ended).join(", "));
+  item("none", "none", "No early in-person voting:", byName(all.filter(a => statusOf(a) === "none")).join(", "), d3.select("#mapNote"));
+}
+
+/* ---------- map ---------- */
+function drawMap(){
+  const tileSize = CONFIG.tileSize;
+  const cellSize = Math.round(tileSize * CONFIG.tileGapFactor);
+  const w = (d3.max(GRID_STATES, d => d.x) + 1) * cellSize;
+  const h = (d3.max(GRID_STATES, d => d.y) + 1) * cellSize;
+
+  const svg = d3.select("#map").append("svg")
+    .attr("viewBox", `0 0 ${w} ${h}`)
+    .attr("role", "img")
+    .attr("aria-label", "Tile map of U.S. states with early in-person voting currently open");
+
+  // green and white stripes for an open period with no end date (the same pattern early_voting.html uses in yellow)
+  const stripes = svg.append("defs").append("pattern")
+    .attr("id", "noEndStripes").attr("patternUnits", "userSpaceOnUse")
+    .attr("width", 8).attr("height", 8).attr("patternTransform", "rotate(45)");
+  stripes.append("rect").attr("width", 8).attr("height", 8).attr("fill", "#fff");
+  stripes.append("rect").attr("width", 4).attr("height", 8).attr("fill", GREEN);
+
+  const state = svg.selectAll(".state")
+    .data(GRID_STATES, d => d.name)
+    .enter()
+    .append("g")
+    .attr("class", d => "state " + d.status)
+    // the tile's color, which its letters take on hover (Missouri's letters get its stripes)
+    .style("--tile-color", d => ({
+      open: GREEN, openNoEnd: "url(#noEndStripes)", after: "#DCDCDC", none: "#fff"
+    })[d.status] || startColor(EV[d.name].start))
+    .attr("transform", d => `translate(${d.x * cellSize + cellSize/2}, ${d.y * cellSize + cellSize/2})`)
+    .on("mouseenter", function(e, d){
+      renderPopup(d.name);
+      positionPopup(e); // taps on touch screens fire no mousemove, so place it now
+    })
+    .on("mousemove", positionPopup)
+    .on("mouseleave", () => d3.select("#tooltip").style("display", "none"));
+
+  state.append("rect").attr("class", "tile")
+    .attr("x", -tileSize/2).attr("y", -tileSize/2)
+    .attr("width", tileSize).attr("height", tileSize)
+    .style("fill", d => d.status === "before" ? startColor(EV[d.name].start) : null);
+  state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name);
+}
+
+function positionPopup(event){
+  const tip = document.getElementById("tooltip");
+  const pad = 14, m = 8;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = event.clientX + pad, y = event.clientY + pad;
+  if (x + w > window.innerWidth - m) x = event.clientX - pad - w;
+  if (y + h > window.innerHeight - m) y = Math.max(m, window.innerHeight - m - h);
+  tip.style.left = Math.max(m, x) + "px";
+  tip.style.top = y + "px";
+}
+
+// on touch screens there is no mouseleave, so a tap anywhere but a state closes the popup
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".state")) d3.select("#tooltip").style("display", "none");
+});
+
+/* ---------- popup: text from early_voting_data.csv, exactly as written ----------
+   Each column name and its value, in CSV order; the state's name is its "State/Territory" value.
+   The begin date and its rule share one heading ("Early Voting Begins"), as do the end date and its rule;
+   the dates are written out in full ("Tuesday, October 20").
+   The one added line is the countdown to the begin date ("Begins in 9 days").
+   States not in the CSV (Alabama, Mississippi, New Hampshire) get no popup. */
+// [heading column, columns shown under it]
+const POPUP_SECTIONS = [
+  ["Early Voting Begins", ["Early Voting Begin Date", "Early Voting Begins"]],
+  ["Early Voting Ends", ["Early Voting End Date", "Early Voting Ends"]],
+  ["Days Early Voting Takes Place", ["Days Early Voting Takes Place"]],
+  ["Hours and Days", ["Hours and Days"]],
+  ["Locations", ["Locations"]]
+];
+function renderPopup(abbr){
+  const panel = d3.select("#tooltip").html("");
+  const row = EV[abbr] && EV[abbr].row;
+  if (!row) { panel.style("display", "none"); return; }
+  panel.style("display", "block");
+  panel.append("h2").text(row["State/Territory"]);
+  const start = EV[abbr].start;
+  if (start) {
+    const n = daysBetween(TODAY, start);
+    const days = k => `${k} day${k === 1 ? "" : "s"}`;
+    panel.append("div").attr("class", "countdown")
+      .text(n > 0 ? `Begins in ${days(n)}` : n === 0 ? "Begins today" : `Began ${days(-n)} ago`);
+  }
+  POPUP_SECTIONS.forEach(([head, cols]) => {
+    const vals = cols.filter(c => row[c]);
+    if (!vals.length) return;
+    panel.append("h3").text(head);
+    // dates written out ("2026-10-20" -> "Tuesday, October 20"); everything else as in the CSV
+    vals.forEach(c => {
+      const isDate = /Date$/.test(c) && /^\d{4}-\d{2}-\d{2}$/.test(row[c]);
+      panel.append("p").classed("date", isDate).text(isDate ? long(row[c]) : row[c]);
+    });
+  });
+}
+
+drawLegend();
+drawMap();
+
+/* When embedded in an iframe, tell the parent page how tall the content is (same as map.html,
+   with its own message type) so the embed can size the iframe to fit. */
+if (window.parent !== window) {
+  const wrapper = document.getElementById("wrapper");
+  const sendHeight = () => {
+    const bottom = wrapper.getBoundingClientRect().bottom + window.scrollY;
+    const height = Math.ceil(bottom + parseFloat(getComputedStyle(document.body).paddingBottom));
+    window.parent.postMessage({ type: "keydates-ev-map-height", height }, "*");
+  };
+  new ResizeObserver(sendHeight).observe(wrapper);
+  window.addEventListener("load", sendHeight);
+}
+</script>
+</body>
+</html>

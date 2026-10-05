@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Midterm items, embedded</title>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  body{
+    margin: 0 auto;
+    padding: 16px;
+    max-width: 1000px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, sans-serif;
+  }
+  h1{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 20px;
+    margin: 0 0 12px;
+    padding-top: 10px;
+  }
+  h2{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 16px;
+    margin: 28px 0 4px;
+    padding-top: 8px;
+  }
+  .item{ padding: 12px 0 24px; font-size: 14px; }
+  a{ font-family: "BentonStrong", system-ui, sans-serif; color: #111; text-decoration: none; }
+  a:hover{ background: #FFD200; }
+  .desc{ display: block; color: #555; margin-top: 2px; }
+  /* each linked page, embedded below its description */
+  /* the box takes the frame's content height (--h, set by the script below) */
+  .frame{ --h: 800px; height: var(--h); margin-top: 10px; overflow: hidden; }
+  iframe{
+    display: block;
+    width: 100%;
+    height: var(--h);
+    border: 0;
+    background: #fff;
+  }
+  /* 50% view: two columns; each page renders at full width, then is scaled to half */
+  #viewToggle{
+    font: inherit;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+    border: 1px solid #111;
+    background: #fff;
+    padding: 4px 10px;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+  #viewToggle:hover{ background: #FFD200; }
+  body.half .grid{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+  body.half .item{ padding-bottom: 12px; }
+  body.half .frame{ height: calc(var(--h) / 2); }
+  body.half iframe{ width: 200%; transform: scale(0.5); transform-origin: 0 0; }
+  /* flag for the page that is published */
+  .live{
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    background: #C8102E;
+    color: #fff;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    vertical-align: 1px;
+  }
+  /* internal-only warning bar */
+  #testBanner{
+    background: #C8102E;
+    color: #fff;
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 6px 16px;
+    margin: 0 0 16px;
+  }
+</style>
+</head>
+<body>
+<div id="testBanner">FOR INTERNAL TESTING ONLY</div>
+<h1>Midterm items, embedded</h1>
+<button id="viewToggle" type="button">50% view</button>
+<section>
+<h2>Election timeline and early voting</h2>
+<div class="grid">
+  <div class="item"><a href="timeline.html">Timeline</a><span class="desc">Key voting and post-election periods, September through January.</span><div class="frame"><iframe src="timeline.html" title="Timeline"></iframe></div></div>
+  <div class="item"><a href="early_voting.html">Early voting by state</a><span class="desc">Each state's early in-person voting period, from its start and end dates.</span><div class="frame"><iframe src="early_voting.html" title="Early voting by state"></iframe></div></div>
+  <div class="item"><a href="early_voting_v2.html">Early voting by day</a><span class="desc">One row shaded by how many jurisdictions have early voting open each day, from the daily totals.</span><div class="frame"><iframe src="early_voting_v2.html" title="Early voting by day"></iframe></div></div>
+  <div class="item"><a href="early_voting_calendar.html">Early voting calendar</a><span class="desc">The same daily totals as a September–November calendar.</span><div class="frame"><iframe src="early_voting_calendar.html" title="Early voting calendar"></iframe></div></div>
+</div>
+</section>
+
+<h2>Key dates map</h2>
+<div class="grid">
+  <div class="item"><a href="map.html">Map</a> <span class="live">LIVE DO NOT EDIT</span><span class="desc">The current key dates map.</span><div class="frame"><iframe src="map.html" title="Map"></iframe></div></div>
+  <div class="item"><a href="calendar.html">Calendar</a><span class="desc">Key dates by day, September through November.</span><div class="frame"><iframe src="calendar.html" title="Calendar"></iframe></div></div>
+  <div class="item"><a href="data.html">Source data</a><span class="desc">Every deadline by state, with a link to the source page for checking.</span></div>
+  <div class="item"><a href="mapcheck.html">Map vs. data check</a><span class="desc">For each state, which CSV rows drive the map's shading, which only show in the popup, and which aren't used.</span></div>
+  <div class="item"><a href="key_dates_test.html">Tester</a><span class="desc">Preview the map as of any date from Sep 1 to Nov 30.</span></div>
+</div>
+
+<script>
+  // Size each frame to its page's content. The pages are on the same site, so their height can be
+  // read directly; if that's blocked (e.g. opened from file://), the frame keeps its 800px height and scrolls.
+  document.querySelectorAll("iframe").forEach(frame => {
+    frame.addEventListener("load", () => {
+      let doc;
+      try { doc = frame.contentDocument; } catch (err) { return; }
+      if (!doc || !doc.body) return;
+      const fit = () => {
+        const h = Math.ceil(Math.max(doc.body.getBoundingClientRect().bottom + frame.contentWindow.scrollY, doc.body.scrollHeight));
+        if (h > 0) frame.parentNode.style.setProperty("--h", h + "px");
+      };
+      fit();
+      new ResizeObserver(fit).observe(doc.body);
+    });
+  });
+
+  // The timeline, early voting calendar and map also post their height when they finish drawing
+  window.addEventListener("message", e => {
+    if (!e.data || typeof e.data.type !== "string" || !e.data.type.endsWith("-height")) return;
+    const frame = [...document.querySelectorAll("iframe")].find(f => f.contentWindow === e.source);
+    if (frame) frame.parentNode.style.setProperty("--h", e.data.height + "px");
+  });
+
+  // 50% / 100% view toggle, remembered in this browser; ?view=50 or ?view=100 in the URL sets it
+  const toggle = document.getElementById("viewToggle");
+  function setHalf(on){
+    document.body.classList.toggle("half", on);
+    toggle.textContent = on ? "100% view" : "50% view";
+    try { localStorage.setItem("indexIframeHalf", on ? "1" : "0"); } catch (err) {}
+  }
+  let saved = false;
+  try { saved = localStorage.getItem("indexIframeHalf") === "1"; } catch (err) {}
+  const fromUrl = new URLSearchParams(location.search).get("view");
+  setHalf(fromUrl ? fromUrl === "50" : saved);
+  toggle.addEventListener("click", () => setHalf(!document.body.classList.contains("half")));
+</script>
+</body>
+</html>
