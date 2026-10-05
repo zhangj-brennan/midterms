@@ -241,8 +241,8 @@ rows.forEach(r => {
    opening: open states green; not yet open by days until their first day, in five-day steps
             (next 5 days, 6–10, 11–15, 16+), yellow to pale yellow; ended grey.
    closing: open states by days until their last day, red to pale red. The red starts at the earliest
-            closing date among open states and runs to the latest, split into four equal steps of days
-            (fewer if the dates span fewer than four days). Not yet open: grey; ended: lighter grey.
+            closing date among open states and runs to the latest, split into three equal steps of days
+            (fewer if the dates span fewer than three days). Not yet open: grey; ended: lighter grey.
    In opening mode, only the steps that still fit before Election Day are shown in the legend. */
 let MODE = new URLSearchParams(location.search).get("mode") === "closing" ? "closing" : "opening";
 const GREEN = "#5BB974", YELLOW = "#FFD200", PALE_YELLOW = "#FFF5C7", RED = "#C8102E", PALE_RED = "#FADADF";
@@ -261,7 +261,7 @@ const STEP_LABELS = [`Next ${STEP} days`, `${STEP + 1}–${2 * STEP} days`, `${2
 const END_DAYS = Object.values(EV).filter(e => e.start && e.end && e.start <= TODAY && e.end >= TODAY).map(e => daysBetween(TODAY, e.end));
 const END_MIN = d3.min(END_DAYS) ?? 0, END_MAX = d3.max(END_DAYS) ?? 0;
 const END_SPAN = END_MAX - END_MIN + 1;
-const N_CLOSE = Math.min(4, END_SPAN);
+const N_CLOSE = Math.min(3, END_SPAN);
 const CLOSE_COLORS = N_CLOSE === 1 ? [RED] : d3.quantize(d3.interpolateLab(RED, PALE_RED), N_CLOSE);
 const endBucketOf = iso => Math.max(0, Math.min(N_CLOSE - 1, Math.floor((daysBetween(TODAY, iso) - END_MIN) * N_CLOSE / END_SPAN)));
 // each closing step's first and last day count, for the legend ("22–24 days")
