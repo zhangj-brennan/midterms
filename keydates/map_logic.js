@@ -5,6 +5,12 @@
 // Every row and event carries `src`: the CSV rows it came from (see `csv` in load_state_dates.js).
 // The map ignores `src`; mapcheck.html uses it to trace dates back to CSV lines.
 
+/* A state's early-voting rows minus the ones that need an excuse (note "… with excuse" or "Excuse required"),
+   e.g. Kentucky's and Missouri's excuse-only in-person absentee windows. Used by both the popup and the shading. */
+function earlyVotingRows(s){
+  return (s.earlyVoting || []).filter(i => !/with excuse|excuse required/i.test(i.note || ""));
+}
+
 /* ---------- popup parsing: CSV rows -> the lines in a state's popup ----------
    One state's deadlines as { date, what, how, time, note, src } rows; ranges become a start row and an end row.
    `dated` rows are grouped under date headings; `undated` rows go under "Other".
@@ -21,7 +27,8 @@
      Mail ballot request                     -> single date: "Mail ballot request deadline — <label>"
                                                 range: "<Label> begins/ends" (e.g. "Emergency ballot period")
      Mail ballot return                      -> "Mail ballots due — <label>" (every row)
-     Early voting                            -> range: "<Label> begins/ends"; no dates: listed under "Other"
+     Early voting                            -> range: "<Label> begins/ends"; no dates: listed under "Other";
+                                                rows that need an excuse are left out (earlyVotingRows)
      (always)                                -> "Election Day" on Nov 3
    The row's label becomes the "how" text after " — " with a trailing " by" dropped; times
    ("5:00PM" -> "5 p.m.") and abbreviated dates in labels/notes are rewritten by spellDates(), and
@@ -61,7 +68,7 @@ function stateKeyDates(s, electionDay){
   (s.mailReturn || []).forEach(i => push(i.date, "Mail ballots due", i));
   // "Early Voting" rows read "In-person early voting", since mail voting is early voting too;
   // rows with no dates saying there is none ("None on Record", "Not available…") read "No early in-person voting"
-  (s.earlyVoting || []).forEach(i => {
+  earlyVotingRows(s).forEach(i => {
     const what = /^early voting$/i.test(i.label || "Early voting") ? "In-person early voting" : sentence(i.label);
     if (i.start) {
       push(i.start, `${what} begins`, {}, { note: i.note, src: [i.csv] });
@@ -127,7 +134,7 @@ function buildEvents(stateDates, electionDay){
 
     // Early voting begins / ends: the EARLIEST start and the LATEST end across the rows labeled "Early Voting".
     // A state can also list in-person absentee windows; those are used only when it has no dated "Early Voting" row.
-    const evDated = (s.earlyVoting || []).filter(i => i.start || i.end);
+    const evDated = earlyVotingRows(s).filter(i => i.start || i.end);
     const ev = evDated.filter(i => /^early voting$/i.test(i.label || "Early voting"));
     const evRows = ev.length ? ev : evDated;
     const starts = evRows.filter(i => i.start).sort((a, b) => d3.ascending(a.start, b.start));
