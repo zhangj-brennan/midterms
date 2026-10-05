@@ -28,9 +28,9 @@
 
   #title{
     font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 18px;
+    font-size: 20px;
     padding: 10px 0 4px;
-    margin-bottom: 16px;
+    margin-bottom: 32px;
     border-top: 3px solid #111;
   }
 
@@ -38,20 +38,21 @@
   #calendar{
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px;
+    gap: 61px;
   }
   .month h4{
     font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 14px;
+    font-size: 20px;
     margin: 0 0 6px;
   }
   .days{
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 2px;
+    gap: 3px;
   }
+  /* weekday letters match the date numbers in size */
   .dow{
-    font-size: 11px;
+    font-size: var(--num-size, 18px);
     text-align: center;
     padding-bottom: 3px;
   }
@@ -70,14 +71,22 @@
     align-items: center;
     justify-content: center;
     font-family: "BentonMedium", system-ui, sans-serif;
-    font-size: var(--num-size, 15px);
+    font-size: var(--num-size, 18px);
     line-height: 1;
   }
-  .day.out .num{ color: #B8B8B8; }
+  .day.out .num{ color: #B8B8B8; font-family: "Benton", system-ui, sans-serif; }
   /* markers: Election Day solid, peak days dotted */
   .day.eday{ outline: 2px solid #111; outline-offset: -2px; }
   /* white band under the dots so they show on the darkest squares */
-  .day.peak{ outline: 2px dotted #111; outline-offset: -2px; box-shadow: inset 0 0 0 2px #fff; }
+  /* drawn with gradients so the dash and gap lengths can be set (4px dash, 2px gap) */
+  :root{
+    --dash-h: repeating-linear-gradient(90deg, #111 0 4px, transparent 4px 6px);
+    --dash-v: repeating-linear-gradient(180deg, #111 0 4px, transparent 4px 6px);
+    --dashes: var(--dash-h) top / 100% 2px no-repeat, var(--dash-h) bottom / 100% 2px no-repeat,
+              var(--dash-v) left / 2px 100% no-repeat, var(--dash-v) right / 2px 100% no-repeat;
+  }
+  .day.peak{ box-shadow: inset 0 0 0 2px #fff; }
+  .day.peak::after{ content: ""; position: absolute; inset: 0; background: var(--dashes); pointer-events: none; }
   .day.data:hover, .day.active{ outline: 2px solid #111; outline-offset: 0; z-index: 1; }
 
 
@@ -85,7 +94,7 @@
   /* legend: shading on the first line, markers on the second */
   #legend{
     font-size: 12px;
-    margin-top: 16px;
+    margin-top: 26px;
   }
   #legend .legendRow{
     display: flex;
@@ -99,7 +108,7 @@
   #legend .swatch{ width: 14px; height: 14px; flex: none; background: #F2F2F2; }
   #legend .ramp{ width: 140px; height: 10px; flex: none; }
   #legend .swatch.eday{ background: #fff; outline: 2px solid #111; outline-offset: -2px; }
-  #legend .swatch.peak{ background: #fff; outline: 2px dotted #111; outline-offset: -2px; }
+  #legend .swatch.peak{ background: var(--dashes), #fff; }
 
   #tip{
     position: fixed;
@@ -135,8 +144,7 @@
   #source a:hover{ text-decoration: underline; }
 
   @media (max-width: 600px){
-    #title{ font-size: 16px; }
-    #calendar{ grid-template-columns: minmax(0, 380px); gap: 18px; }
+    #calendar{ grid-template-columns: minmax(0, 300px); justify-content: center; gap: 38px; }
   }
 </style>
 </head>
@@ -284,14 +292,22 @@
     el("span", "swatch eday", edayItem);
     edayItem.append("Election Day");
 
-    // Date numbers scale with the squares
+    // Grid text is 18px, shrinking only when the squares are too small to hold it
     function layout(){
       const size = cal.querySelector(".day").getBoundingClientRect().width;
-      cal.style.setProperty("--num-size", Math.max(8, Math.min(16, Math.round(size * 0.42))) + "px");
+      cal.style.setProperty("--num-size", Math.min(18, Math.round(size * 0.5)) + "px");
+      // Month titles line up with the left edge of the first weekday letter
+      cal.querySelectorAll(".month").forEach(month => {
+        const h4 = month.querySelector("h4");
+        const range = document.createRange();
+        range.selectNodeContents(month.querySelector(".dow"));
+        h4.style.paddingLeft = (range.getBoundingClientRect().left - month.getBoundingClientRect().left) + "px";
+      });
       if (window.sendEmbedHeight) window.sendEmbedHeight();
     }
     layout();
     window.addEventListener("resize", layout);
+    document.fonts.ready.then(layout);
   });
 </script>
 <script>
