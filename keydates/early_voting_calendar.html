@@ -90,11 +90,10 @@
   .day.data:hover, .day.active{ outline: 2px solid #111; outline-offset: 0; z-index: 1; }
 
 
-  /* legend under the calendar */
-  /* legend: shading on the first line, markers on the second */
+  /* legend above the calendar: shading on the first line, markers on the second */
   #legend{
     font-size: 12px;
-    margin-top: 26px;
+    margin-bottom: 26px;
   }
   #legend .legendRow{
     display: flex;
@@ -151,9 +150,9 @@
 <body>
 <div id="wrapper">
   <div id="title">Number of States &amp; Territories With Early In-Person Voting Available</div>
-  <div id="calendar"></div>
 
   <div id="legend"></div>
+  <div id="calendar"></div>
 
   <div id="note"><b>Note:</b> Each square shows how many jurisdictions have in-person early voting open on that calendar date. Sept 4-Nov 3, 2026 | Out of 51 jurisdictions: 50 states, D.C., Guam, Puerto Rico, and the U.S. Virgin Islands. Alabama, Mississippi and New Hampshire do not offer early in-person voting.</div>
 
