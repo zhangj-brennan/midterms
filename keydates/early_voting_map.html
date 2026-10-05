@@ -85,7 +85,7 @@
   .legend .swatch.open{ background: #5BB974; }
   .legend .swatch.openNoEnd{ background: repeating-linear-gradient(135deg, #5BB974 0 2px, #fff 2px 4px); }
   /* the four first-day ranges, yellow (soonest) to pale yellow */
-  .legend .buckets{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 2px; }
+  .legend .buckets{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
   .legend .bucket{ display: flex; gap: 5px; align-items: center; }
   .legend .bucket .swatch{ margin-top: 0; }
   .legend .swatch.none{ background: #fff; border: 1px solid #DCDCDC; }
@@ -313,9 +313,9 @@ function drawLegend(){
   const before = all.filter(a => statusOf(a) === "before");
   if (before.length) {
     const it = legend.append("div").attr("class", "item");
-    const txt = it.append("span");
-    txt.append("span").attr("class", "type").text("Opening in:");
-    const buckets = txt.append("span").attr("class", "buckets");
+    // heading and the step keys on one line (wraps only on narrow screens)
+    const buckets = it.append("span").attr("class", "buckets");
+    buckets.append("span").attr("class", "type").text("Opening in:");
     BUCKETS.forEach((b, i) => {
       const k = buckets.append("span").attr("class", "bucket");
       asKey(k, "bucket" + i);

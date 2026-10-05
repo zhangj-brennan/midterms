@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Midterm items, embedded</title>
+<title>Midterm items, iframes testing</title>
 <style>
   @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
   @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
@@ -84,25 +84,15 @@
 </head>
 <body>
 <div id="testBanner">FOR INTERNAL TESTING ONLY</div>
-<h1>Midterm items, embedded</h1>
+<h1>Midterm items, iframes testing</h1>
 <button id="viewToggle" type="button">50% view</button>
-<section>
-<h2>Election timeline and early voting</h2>
 <div class="grid">
-  <div class="item"><a href="timeline.html">Timeline</a><span class="desc">Key voting and post-election periods, September through January.</span><div class="frame"><iframe src="timeline.html" title="Timeline"></iframe></div></div>
-  <div class="item"><a href="early_voting.html">Early voting by state</a><span class="desc">Each state's early in-person voting period, from its start and end dates.</span><div class="frame"><iframe src="early_voting.html" title="Early voting by state"></iframe></div></div>
-  <div class="item"><a href="early_voting_v2.html">Early voting by day</a><span class="desc">One row shaded by how many jurisdictions have early voting open each day, from the daily totals.</span><div class="frame"><iframe src="early_voting_v2.html" title="Early voting by day"></iframe></div></div>
-  <div class="item"><a href="early_voting_calendar.html">Early voting calendar</a><span class="desc">The same daily totals as a September–November calendar.</span><div class="frame"><iframe src="early_voting_calendar.html" title="Early voting calendar"></iframe></div></div>
-</div>
-</section>
-
-<h2>Key dates map</h2>
-<div class="grid">
-  <div class="item"><a href="map.html">Map</a> <span class="live">LIVE DO NOT EDIT</span><span class="desc">The current key dates map.</span><div class="frame"><iframe src="map.html" title="Map"></iframe></div></div>
-  <div class="item"><a href="calendar.html">Calendar</a><span class="desc">Key dates by day, September through November.</span><div class="frame"><iframe src="calendar.html" title="Calendar"></iframe></div></div>
-  <div class="item"><a href="data.html">Source data</a><span class="desc">Every deadline by state, with a link to the source page for checking.</span></div>
-  <div class="item"><a href="mapcheck.html">Map vs. data check</a><span class="desc">For each state, which CSV rows drive the map's shading, which only show in the popup, and which aren't used.</span></div>
-  <div class="item"><a href="key_dates_test.html">Tester</a><span class="desc">Preview the map as of any date from Sep 1 to Nov 30.</span></div>
+  <div class="item"><a href="timeline.html">Timeline</a><div class="frame"><iframe src="timeline.html" title="Timeline"></iframe></div></div>
+  <div class="item"><a href="early_voting_v2.html">Early voting by day</a><div class="frame"><iframe src="early_voting_v2.html" title="Early voting by day"></iframe></div></div>
+  <div class="item"><a href="early_voting_calendar.html">Early voting calendar</a><div class="frame"><iframe src="early_voting_calendar.html" title="Early voting calendar"></iframe></div></div>
+  <div class="item"><a href="early_voting_map.html">Early voting today</a><div class="frame"><iframe src="early_voting_map.html" title="Early voting today"></iframe></div></div>
+  <div class="item"><a href="map.html">Map</a> <span class="live">LIVE DO NOT EDIT</span><div class="frame"><iframe src="map.html" title="Map"></iframe></div></div>
+  <div class="item"><a href="early_voting.html">Early voting by state</a><div class="frame"><iframe src="early_voting.html" title="Early voting by state"></iframe></div></div>
 </div>
 
 <script>
