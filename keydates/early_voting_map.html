@@ -28,16 +28,31 @@
 
   /* opening / closing toggle, just above the title's top rule on the right */
   #toolbar{ display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  #toolbar{ align-items: center; gap: 8px; font-family: "BentonStrong", system-ui, sans-serif; font-size: 12px; }
+  .modeLabel{ cursor: pointer; color: #999; user-select: none; }
+  .modeLabel.active{ color: #111; }
   #modeToggle{
-    font: inherit;
-    font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 12px;
+    position: relative;
+    width: 34px;
+    height: 18px;
+    padding: 0;
     border: 1px solid #111;
+    border-radius: 9px;
     background: #fff;
-    padding: 3px 10px;
     cursor: pointer;
   }
-  #modeToggle:hover{ background: #111; color: #fff; }
+  #modeToggle::after{
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #111;
+    transition: transform .15s ease;
+  }
+  #modeToggle[aria-checked="true"]::after{ transform: translateX(16px); }
 
   #title{
     font-family: "BentonStrong", system-ui, sans-serif;
@@ -167,7 +182,7 @@
 <div id="wrapper">
   <div id="testBanner">FOR TESTING ONLY DO NOT SHARE</div>
   <div class="panel">
-      <div id="toolbar"><button id="modeToggle" type="button">Show closing</button></div>
+      <div id="toolbar"><span class="modeLabel" data-mode="opening">Show open</span><button id="modeToggle" type="button" role="switch" aria-checked="false" aria-label="Show closing"></button><span class="modeLabel" data-mode="closing">Show closing</span></div>
       <div id="title">Early In-Person Voting Currently Open</div>
       <div class="subtitle">Hover over a state to see its early voting period.</div>
       <div id="mapLegend" class="legend"></div>
@@ -508,11 +523,13 @@ const TITLES = { opening: "Early In-Person Voting Currently Open", closing: "Ear
 function render(){
   highlight(null);
   d3.select("#title").text(TITLES[MODE]);
-  d3.select("#modeToggle").text(MODE === "opening" ? "Show closing" : "Show opening");
+  d3.select("#modeToggle").attr("aria-checked", MODE === "closing");
+  d3.selectAll(".modeLabel").classed("active", function(){ return this.dataset.mode === MODE; });
   drawLegend();
   drawMap();
 }
 d3.select("#modeToggle").on("click", () => { MODE = MODE === "opening" ? "closing" : "opening"; render(); });
+d3.selectAll(".modeLabel").on("click", function(){ MODE = this.dataset.mode; render(); });
 render();
 
 /* When embedded in an iframe, tell the parent page how tall the content is (same as map.html,
