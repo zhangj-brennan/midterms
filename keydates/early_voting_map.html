@@ -384,7 +384,7 @@ function drawLegend(){
 
   if (MODE === "opening") {
     const nOpen = withStatus("open").length + openNoEnd.length;
-    item("open", GREEN, `${nOpen === 0 ? "No states are" : nOpen === 1 ? "1 state is" : `${nOpen} states are`} open today, ${long(TODAY)}`);
+    item("open", GREEN, `${nOpen === 0 ? "No states are" : nOpen === 1 ? "1 state is" : `${nOpen} states are`} currently open`);
     if (openNoEnd.length) item("openNoEnd", stripes(GREEN), "Open, end date not specified:", byName(openNoEnd).join(", "));
     if (before.length) steps("Opening in:", OPEN_COLORS, STEP_LABELS);
   } else {
