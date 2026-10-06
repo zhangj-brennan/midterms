@@ -93,9 +93,27 @@
     font-size: 12px;
     width: 300px;
     max-width: calc(100vw - 32px);
+    /* when embedded, the frame is only as tall as the page: long popups scroll instead of running off the bottom */
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: none;
     z-index: 10;
   }
+  /* clicking a state pins its popup in place so it can be scrolled with the mouse or a swipe */
+  #tooltip.pinned{ pointer-events: auto; }
+  #tooltip .close{
+    display: none;
+    float: right;
+    margin: -6px -6px 0 8px;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    font: 20px/1 system-ui, sans-serif;
+    color: #555;
+    cursor: pointer;
+  }
+  #tooltip.pinned .close{ display: block; }
   #tooltip h2{
     font-family: "BentonStrong", system-ui, sans-serif;
     font-size: 17px;
@@ -123,11 +141,6 @@
   #tooltip h3 .countdown{ background: #FFD200; padding: 1px 5px; margin-left: 6px; }
   #tooltip h3.past{ color: #888; text-decoration: line-through; }
   #tooltip .note{ color: #777; font-size: 11px; display: block; }
-  /* popups too tall for the frame get wider and flow into columns (see fitPopup) */
-  #tooltip.cols{ column-gap: 18px; }
-  #tooltip.cols h2, #tooltip.cols .electionName, #tooltip.cols > .note{ column-span: all; }
-  #tooltip.cols h3{ break-after: avoid; margin-top: 0; padding-top: 9px; }
-  #tooltip.cols ul{ break-inside: avoid; }
 
   #footer{ margin-top: 20px; font-size: 12px; color: #000; }
   #footer a{ color: #007194; text-decoration: none; }
@@ -270,12 +283,26 @@ function drawMap(){
     .attr("transform", d => `translate(${d.x * cellSize + cellSize/2}, ${d.y * cellSize + cellSize/2})`)
     .on("mouseenter", function(e, d){
       d3.select(this).raise(); // keep the hover outline above neighboring tiles
+      if (pinned) return; // a pinned popup stays put until it's closed
       renderPopup(d.name);
-      positionPopup(e); // taps on touch screens fire no mousemove, so place it now
+      positionPopup(e);
     })
-    .on("mousemove", positionPopup)
+    .on("mousemove", e => { if (!pinned) positionPopup(e); })
+    // click (or tap) pins the popup so it can be scrolled
+    .on("click", (e, d) => {
+      pinned = d.name;
+      renderPopup(d.name);
+      positionPopup(e);
+    })
+    // the popup follows the cursor, so the mouse wheel over a state scrolls a long popup
+    .on("wheel", e => {
+      const tip = document.getElementById("tooltip");
+      if (tip.scrollHeight <= tip.clientHeight) return;
+      e.preventDefault();
+      tip.scrollTop += e.deltaY;
+    })
     .on("mouseleave", () => {
-      d3.select("#tooltip").style("display", "none");
+      if (!pinned) hidePopup();
     });
 
   state.append("rect").attr("class", "tile")
@@ -304,23 +331,6 @@ function drawMap(){
   state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
 }
 
-// When embedded, the iframe is only as tall as the page, so a long popup can run off the bottom.
-// If it doesn't fit, widen it and flow the dates into 2 or 3 columns until it does (or space runs out).
-function fitPopup(){
-  const tip = document.getElementById("tooltip");
-  const m = 8, maxH = window.innerHeight - 2 * m, maxW = window.innerWidth - 2 * m;
-  tip.classList.remove("cols");
-  tip.style.width = tip.style.columnCount = "";
-  for (const n of [2, 3]) {
-    if (tip.offsetHeight <= maxH) break;
-    const w = Math.min(300 * n, maxW);
-    if (w < 220 * n) break; // too narrow for another readable column
-    tip.classList.add("cols");
-    tip.style.columnCount = n;
-    tip.style.width = w + "px";
-  }
-}
-
 function positionPopup(event){
   const tip = document.getElementById("tooltip");
   const pad = 14, m = 8;
@@ -328,20 +338,28 @@ function positionPopup(event){
   let x = event.clientX + pad, y = event.clientY + pad;
   // flip to the other side of the cursor when it would overflow the viewport
   if (x + w > window.innerWidth - m) x = event.clientX - pad - w;
-  if (x < m) x = Math.min(m, window.innerWidth - m - w); // wide popups: keep inside the frame
   if (y + h > window.innerHeight - m) y = Math.max(m, window.innerHeight - m - h);
   tip.style.left = Math.max(m, x) + "px";
   tip.style.top = y + "px";
 }
 
-// on touch screens there is no mouseleave, so a tap anywhere but a state closes the popup
+let pinned = null; // abbreviation of the state whose popup was clicked open
+function hidePopup(){
+  pinned = null;
+  d3.select("#tooltip").style("display", "none").classed("pinned", false);
+}
+
+// a click or tap anywhere but a state or the popup closes it (touch screens have no mouseleave)
 document.addEventListener("pointerdown", e => {
-  if (!e.target.closest(".state")) d3.select("#tooltip").style("display", "none");
+  if (!e.target.closest(".state, #tooltip")) hidePopup();
 });
 
 /* ---------- popup ---------- */
 function renderPopup(abbr){
-  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", true);
+  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", true)
+    .classed("pinned", !!pinned);
+  panel.node().scrollTop = 0;
+  panel.append("button").attr("class", "close").attr("aria-label", "Close").text("×").on("click", hidePopup);
   const s = STATE_DATES[abbr];
   panel.append("h2").text(s.name);
   panel.append("div").attr("class", "electionName").text(s.election + " — " + long(ELECTION_DAY));
@@ -376,7 +394,6 @@ function renderPopup(abbr){
   }
 
   if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(sentenceCase(spellDates(s.note), true));
-  fitPopup();
 }
 
 /* stateKeyDates() — which CSV rows become which popup lines — is in map_logic.js. */
