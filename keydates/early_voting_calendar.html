@@ -28,7 +28,7 @@
 
   #title{
     font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 20px;
+    font-size: 18px;
     padding: 10px 0 4px;
     margin-bottom: 32px;
     border-top: 3px solid #111;
@@ -42,17 +42,17 @@
   }
   .month h4{
     font-family: "BentonStrong", system-ui, sans-serif;
-    font-size: 20px;
+    font-size: 15px;
     margin: 0 0 6px;
   }
   .days{
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 3px;
+    gap: 5px;
   }
   /* weekday letters match the date numbers in size */
   .dow{
-    font-size: var(--num-size, 18px);
+    font-size: var(--num-size, 14px);
     text-align: center;
     padding-bottom: 3px;
   }
@@ -71,7 +71,7 @@
     align-items: center;
     justify-content: center;
     font-family: "BentonMedium", system-ui, sans-serif;
-    font-size: var(--num-size, 18px);
+    font-size: var(--num-size, 14px);
     line-height: 1;
   }
   .day.out .num{ color: #B8B8B8; font-family: "Benton", system-ui, sans-serif; }
@@ -101,11 +101,14 @@
     align-items: center;
     gap: 6px 14px;
   }
-  #legend .legendRow + .legendRow{ margin-top: 8px; }
+  #legend .legendRow + .legendRow{ margin-top: 20px; }  /* room for the step numbers hanging under the bar */
   #legend .legendTitle{ font-family: "BentonMedium", system-ui, sans-serif; }
   #legend .item{ display: flex; align-items: center; gap: 6px; }
   #legend .swatch{ width: 14px; height: 14px; flex: none; background: #F2F2F2; }
-  #legend .ramp{ width: 140px; height: 10px; flex: none; }
+  /* shading steps: a row of blocks, with each threshold under the divider where it starts */
+  #legend .steps{ --step-w: 40px; --step-gap: 2px; position: relative; display: flex; gap: var(--step-gap); }
+  #legend .stepSwatch{ display: block; width: var(--step-w); height: 10px; }
+  #legend .stepLabel{ position: absolute; top: 13px; transform: translateX(-50%); font-size: 11px; line-height: 1; }
   #legend .swatch.eday{ background: #fff; outline: 2px solid #111; outline-offset: -2px; }
   #legend .swatch.peak{ background: var(--dashes), #fff; }
 
@@ -143,6 +146,7 @@
   #source a:hover{ text-decoration: underline; }
 
   @media (max-width: 600px){
+    #title{ font-size: 16px; }  /* same as the timeline */
     #calendar{ grid-template-columns: minmax(0, 300px); justify-content: center; gap: 38px; }
   }
 </style>
@@ -238,7 +242,10 @@
 
     const shown = [...counts].filter(([t]) => inRange(new Date(t))).map(([, k]) => k);
     const max = d3.max(shown);
-    const color = d3.scaleLinear().domain([1, max]).range([LIGHT, DARK]).interpolate(d3.interpolateLab);
+    // Shading in steps of 10 (1–9, 10–19, ...), light to dark, through the peak
+    const BREAKS = d3.range(10, max + 1, 10);   // a count at or above a break moves up a step
+    const BUCKET_COLORS = d3.quantize(d3.interpolateLab(LIGHT, DARK), BREAKS.length + 1);
+    const color = d3.scaleThreshold().domain(BREAKS).range(BUCKET_COLORS);
     const fill = k => k === 0 ? "none" : color(k);
     // dark text on light cells, white on dark ones
     const ink = k => k === 0 ? OFF_INK : d3.lab(color(k)).l < 55 ? "#fff" : "#111";
@@ -278,16 +285,22 @@
       }
     }
 
-    // Legend: title and ramp on one line, the two markers on the next
+    // Legend: title and steps on one line, the two markers on the next
     const legendEl = document.getElementById("legend");
     const legend = el("div", "legendRow", legendEl);
     const markers = el("div", "legendRow", legendEl);
     el("div", "legendTitle", legend).textContent = "Jurisdictions with early voting open";
-    const rampItem = el("div", "item", legend);
-    rampItem.append("1");
-    const ramp = el("span", "ramp", rampItem);
-    ramp.style.background = `linear-gradient(to right, ${color(1)}, ${color(max)})`;
-    rampItem.append(`${max}`);
+    // one block per step; labels under the outer edges (1 and the peak) and the dividers between blocks (the thresholds)
+    const steps = el("div", "steps", legend);
+    BUCKET_COLORS.forEach(c => el("span", "stepSwatch", steps).style.background = c);
+    const n = BUCKET_COLORS.length;
+    [[0, 1], ...BREAKS.map((b, i) => [i + 1, b]), [n, max]].forEach(([i, text]) => {
+      const label = el("span", "stepLabel", steps);
+      label.textContent = text;
+      // centered on the edge of block i: the outer edges of the bar, or the middle of a gap between blocks
+      const shift = i === 0 ? "0px" : i === n ? "var(--step-gap)" : "var(--step-gap) / 2";
+      label.style.left = `calc(${i} * (var(--step-w) + var(--step-gap)) - ${shift})`;
+    });
     const peakItem = el("div", "item", markers);
     el("span", "swatch peak", peakItem);
     peakItem.append(`Peak: ${max}`);
@@ -295,10 +308,10 @@
     el("span", "swatch eday", edayItem);
     edayItem.append("Election Day");
 
-    // Grid text is 18px, shrinking only when the squares are too small to hold it
+    // Grid text is 14px, shrinking only when the squares are too small to hold it
     function layout(){
       const size = cal.querySelector(".day").getBoundingClientRect().width;
-      cal.style.setProperty("--num-size", Math.min(18, Math.round(size * 0.5)) + "px");
+      cal.style.setProperty("--num-size", Math.min(14, Math.round(size * 0.4)) + "px");
       // Month titles line up with the left edge of the first weekday letter
       cal.querySelectorAll(".month").forEach(month => {
         const h4 = month.querySelector("h4");
