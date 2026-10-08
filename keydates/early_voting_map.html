@@ -241,8 +241,8 @@ const short = iso => fmtShort(parse(iso));
 const long  = iso => fmtLong(parse(iso));
 const daysBetween = (a, b) => d3.timeDay.count(parse(a), parse(b));
 
-/* One record per state from early_voting_data.csv, with begin/end dates from the master
-   state_dates_2026.csv (see early_voting_dates.js). States not in the CSV (Alabama, Mississippi,
+/* One record per state from 10082026_early_voting_data_WITHNOTES.csv, with its updated begin/end
+   dates (see early_voting_dates.js). States not in the CSV (Alabama, Mississippi,
    New Hampshire) have no early in-person voting. A missing end date is treated as open from the
    start date on, through the day before Election Day. */
 const rows = await loadEarlyVotingRows();
@@ -267,7 +267,7 @@ rows.forEach(r => {
 let MODE = new URLSearchParams(location.search).get("mode") === "closing" ? "closing" : "opening";
 const GREEN = "#5BB974", YELLOW = "#FFD200", PALE_YELLOW = "#FFF5C7", RED = "#C8102E", PALE_RED = "#FADADF";
 const GREY = "#DCDCDC", TBD_GREY = "#ABABAB", NOT_OPEN_GREY = "#BDBDBD";
-// closing mode: states whose early voting hasn't ended but that have no closing date (none at present: Missouri had none in the NCSL data, but the master gives Nov. 2)
+// closing mode: states whose early voting hasn't ended but that have no closing date (none at present: Missouri had none in the NCSL data, but the updated end date is Nov. 2)
 const noClosingDate = abbr => EV[abbr] && EV[abbr].start && !EV[abbr].end && ["before", "openNoEnd"].includes(statusOf(abbr));
 const STEP = 5;
 const OPEN_COLORS = d3.quantize(d3.interpolateLab(YELLOW, PALE_YELLOW), 4);
@@ -480,7 +480,7 @@ document.addEventListener("pointerdown", e => {
   if (!e.target.closest(".state")) d3.select("#tooltip").style("display", "none");
 });
 
-/* ---------- popup: text from early_voting_data.csv, exactly as written (dates from the master; see early_voting_dates.js) ----------
+/* ---------- popup: text from 10082026_early_voting_data_WITHNOTES.csv, exactly as written (dates are the updated ones; see early_voting_dates.js) ----------
    Each column name and its value, in CSV order; the state's name is its "State/Territory" value.
    The begin date and its rule share one heading ("Early Voting Opens"), as do the end date and its rule;
    the dates are written out in full ("Tuesday, October 20").

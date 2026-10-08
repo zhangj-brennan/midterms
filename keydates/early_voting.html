@@ -229,7 +229,7 @@
   document.addEventListener("click", hideTip);
   window.addEventListener("scroll", hideTip, { passive: true });
 
-  // early_voting_data.csv, with begin/end dates from the master state_dates_2026.csv (see early_voting_dates.js)
+  // 10082026_early_voting_data_WITHNOTES.csv, with its updated begin/end dates (see early_voting_dates.js)
   loadEarlyVotingRows().then(rows => {
 
     // Source line lives in the last row of the sheet
@@ -244,7 +244,7 @@
       a.target = "_blank";
       a.rel = "noopener";
     }
-    // dates come from the master file (see early_voting_dates.js)
+    // dates are the updated start/end dates (see early_voting_dates.js)
     src.append("; early voting dates: ");
     const usvf = el("a", "", src);
     usvf.href = "https://www.usvotefoundation.org/state-election-dates-and-deadlines";

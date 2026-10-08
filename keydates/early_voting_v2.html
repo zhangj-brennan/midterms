@@ -156,8 +156,12 @@
   const EMPTY = "#F2F2F2";
   const LIGHT = "#F1DDF1", DARK = "#711471";   // brand purple, light to dark
 
+  // "10/19/2026" (daily totals file) or "2026-10-19"
   const parseDate = s => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((s || "").trim());
+    s = (s || "").trim();
+    let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return new Date(+m[3], m[1] - 1, +m[2]);
+    m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
     return m ? new Date(+m[1], m[2] - 1, +m[3]) : null;
   };
   const dayIndex = (d, start) => Math.round((d - start) / DAY);
@@ -205,7 +209,7 @@
   window.addEventListener("scroll", hideTip, { passive: true });
 
 
-  fetch("early_voting_daily_totals.csv").then(r => r.text()).then(text => {
+  fetch("newdata_10082026/10082026_Early Voting Daily Totals UPDAT.csv").then(r => r.text()).then(text => {
     const rows = d3.csvParse(text);
 
     // Daily counts, keyed by date
