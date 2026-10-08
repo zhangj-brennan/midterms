@@ -63,16 +63,16 @@
     font-size: 13px;
   }
   #download:hover{ background: #FFD200; text-decoration: none; }
-  /* source conflicts summary, above the main table */
-  #conflicts{ border: 1px solid #111; background: #FFF1E0; padding: 12px 14px; margin-bottom: 20px; max-width: 1100px; }
-  #conflicts h2{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 15px; margin: 0 0 4px; }
-  #conflicts .intro{ font-size: 13px; color: #555; margin: 0 0 10px; }
-  #conflicts table{ font-size: 12px; }
-  #conflicts th{ position: static; background: none; border-bottom: 1px solid #111; }
-  #conflicts td{ border-bottom: 1px solid #E8CFB0; background: none; }
-  #conflicts tr:hover td{ background: none; }
-  #conflicts b{ font-family: "BentonStrong", system-ui, sans-serif; font-weight: normal; }
-  #conflicts td.st{ font-family: "BentonStrong", system-ui, sans-serif; white-space: nowrap; }
+  /* boxes above the main table: territory early voting, source conflicts */
+  #territories, #conflicts{ border: 1px solid #111; background: #FFF1E0; padding: 12px 14px; margin-bottom: 20px; max-width: 1100px; }
+  #territories h2, #conflicts h2{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 15px; margin: 0 0 4px; }
+  #territories .intro, #conflicts .intro{ font-size: 13px; color: #555; margin: 0 0 10px; }
+  #territories table, #conflicts table{ font-size: 12px; }
+  #territories th, #conflicts th{ position: static; background: none; border-bottom: 1px solid #111; }
+  #territories td, #conflicts td{ border-bottom: 1px solid #E8CFB0; background: none; }
+  #territories tr:hover td, #conflicts tr:hover td{ background: none; }
+  #territories b, #conflicts b{ font-family: "BentonStrong", system-ui, sans-serif; font-weight: normal; }
+  #territories td.st, #conflicts td.st{ font-family: "BentonStrong", system-ui, sans-serif; white-space: nowrap; }
   /* internal-only warning bar */
   #testBanner{
     background: #C8102E;
@@ -90,6 +90,22 @@
 <div id="testBanner">FOR INTERNAL TESTING ONLY</div>
 <div id="title">Key 2026 Election Dates: Source Data</div>
 <div class="subtitle">Every deadline by state, as used by the map and calendar. Follow each row's source link to check it; "Where on the source page" says where the row's text appears. The Note column contains additional information quoted directly from the linked source. Notes from U.S. Vote Foundation are in tooltips: hover the (!) icon next to the deadline to see them. Each state starts with a link to its official state election site, from <a href="https://www.usa.gov/state-election-office" target="_blank">USA.gov</a>.</div>
+
+<div id="territories">
+  <h2>Guam early voting</h2>
+  <p class="intro">Guam is not in the CSV below. Its early voting (“Early In Office Absentee Voting”) for the 2026 General Election:</p>
+  <table>
+    <thead><tr><th>Dates</th><th>Days and hours</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Thursday, October 8 – Wednesday, October 28</b><br>“Thursday, October 8, 2026 — GENERAL ELECTION EARLY VOTING STARTS”; “Wednesday, October 28, 2026 — LAST DAY FOR GENERAL ELECTION EARLY VOTING”</td>
+        <td><b>Tuesday – Saturday, 10 a.m.–6 p.m.</b>, at the Westin Resort (Mezzanine Level). “Registered voters of Guam may exercise their right to vote for the 2026 General Election via absentee ballot at the Westin Resort (Mezzanine Level) Tuesday – Saturday 10:00AM to 6:00PM from October 8th to October 28th.” The 2026 pages list Tuesday – Saturday only; they don’t mention Sundays or Mondays. (In 2024 it was Monday to Saturday: <a href="https://gec.guam.gov/2024-general-election/" target="_blank">2024 General Election</a>.)</td>
+        <td><a href="https://gec.guam.gov/early-in-office-absentee-voting/" target="_blank">Guam Election Commission: Early In Office Absentee Voting</a><br>
+          <a href="https://gec.guam.gov/2026-important-dates/" target="_blank">Guam Election Commission: 2026 Important Dates</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 <div id="conflicts">
   <h2>Conflicts between VOTE411 and U.S. Vote Foundation</h2>

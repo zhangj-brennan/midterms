@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Early Voting Today</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="load_state_dates.js"></script>
+<script src="map_logic.js"></script>
+<script src="early_voting_dates.js"></script>
 <!-- geographic view: state shapes (us-atlas) and tile <-> shape morphing (Flubber), as on the 2030 reapportionment map -->
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flubber@0.4.2/build/flubber.min.js"></script>
@@ -218,7 +221,8 @@
 
   <div id="footer">
     <div class="note"><span class="label">Note:</span> Counted in calendar days.</div>
-    <span class="label">Source:</span> NOTE THIS IS DEREK TISLER SPREADSHEET
+    <span class="label">Source:</span> NOTE THIS IS DEREK TISLER SPREADSHEET (rules, hours and locations).
+    Early voting dates: <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a> and state election offices.
   </div>
 </div>
 
@@ -263,10 +267,11 @@ const short = iso => fmtShort(parse(iso));
 const long  = iso => fmtLong(parse(iso));
 const daysBetween = (a, b) => d3.timeDay.count(parse(a), parse(b));
 
-/* One record per state from early_voting_data.csv. States not in the CSV (Alabama, Mississippi,
-   New Hampshire) have no early in-person voting. A missing end date (Missouri: "Not specified.")
-   is treated as open from the start date on, through the day before Election Day. */
-const rows = await d3.csv("early_voting_data.csv");
+/* One record per state from early_voting_data.csv, with begin/end dates from the master
+   state_dates_2026.csv (see early_voting_dates.js). States not in the CSV (Alabama, Mississippi,
+   New Hampshire) have no early in-person voting. A missing end date is treated as open from the
+   start date on, through the day before Election Day. */
+const rows = await loadEarlyVotingRows();
 const EV = {};
 rows.forEach(r => {
   const abbr = ABBR_BY_NAME.get((r["State/Territory"] || "").trim());
@@ -288,7 +293,7 @@ rows.forEach(r => {
 const MODE = "opening";
 const GREEN = "#5BB974", YELLOW = "#FFD200", PALE_YELLOW = "#FFF5C7", RED = "#C8102E", PALE_RED = "#FADADF";
 const GREY = "#DCDCDC", TBD_GREY = "#ABABAB", NOT_OPEN_GREY = "#BDBDBD";
-// closing mode: states whose early voting hasn't ended but that have no closing date in the CSV (Missouri)
+// closing mode: states whose early voting hasn't ended but that have no closing date (none at present: Missouri had none in the NCSL data, but the master gives Nov. 2)
 const noClosingDate = abbr => EV[abbr] && EV[abbr].start && !EV[abbr].end && ["before", "openNoEnd"].includes(statusOf(abbr));
 const STEP = 5;
 const OPEN_COLORS = d3.quantize(d3.interpolateLab(YELLOW, PALE_YELLOW), 4);
@@ -352,7 +357,7 @@ function fillOf(abbr){
   return NOT_OPEN_GREY;
 }
 
-/* Legend keys -> the states they stand for. In opening mode "open" includes Missouri (open, no end
+/* Legend keys -> the states they stand for. In opening mode "open" includes states open with no end
    date), since the open count does. The five-day steps are "bucket0".."bucket3". */
 function keysOf(abbr){
   const status = statusOf(abbr);
@@ -663,7 +668,7 @@ document.addEventListener("pointerdown", e => {
   if (!e.target.closest(".state")) d3.select("#tooltip").style("display", "none");
 });
 
-/* ---------- popup: text from early_voting_data.csv, exactly as written ----------
+/* ---------- popup: text from early_voting_data.csv, exactly as written (dates from the master; see early_voting_dates.js) ----------
    Each column name and its value, in CSV order; the state's name is its "State/Territory" value.
    The begin date and its rule share one heading ("Early Voting Opens"), as do the end date and its rule;
    the dates are written out in full ("Tuesday, October 20").
