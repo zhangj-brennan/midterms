@@ -146,11 +146,13 @@
     width: max-content;
     max-width: 120px;
     z-index: 1;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.25;
     background: #fff;
   }
-  .vline-label .date{ display: block; font-family: "BentonStrong", system-ui, sans-serif; }
+  /* label ends at its line instead of starting there */
+  .vline-label.left-of-line{ left: auto; right: -6px; text-align: right; }
+  .vline-label .date{ display: block; white-space: nowrap; font-family: "BentonStrong", system-ui, sans-serif; }
 
   #source{
     font-size: 12px;
@@ -167,14 +169,14 @@
     /* narrower label column; labels wrap instead of overlapping the chart */
     #chart{ --label-w: 110px; }
     #title{ font-size: 16px; }
-    .label{ padding: 3px 8px 3px 0; font-size: 11px; line-height: 1.15; white-space: normal; }
-    .label .note{ font-size: 10px; margin-top: 0; }
+    .label{ padding: 3px 8px 3px 0; font-size: 12px; line-height: 1.15; white-space: normal; }
+    .label .note{ font-size: 12px; margin-top: 0; }
     .track{ height: 22px; }
     .axis .track{ height: 30px; }
     .bar{ top: 5px; height: 12px; }
     .point{ top: 6px; }
-    .month{ font-size: 10px; height: 15px; }
-    .vline-label{ font-size: 10px; max-width: 90px; }
+    .month{ font-size: 12px; height: 17px; }
+    .vline-label{ font-size: 12px; max-width: 90px; }
   }
 
 
@@ -196,7 +198,7 @@
 
   // start/end as [month (1-12), day, year]; point events have no end
   const EVENTS = [
-    { name: "Mail-in voting",               start: [9, 4, 2026],  end: [11, 3, 2026] },
+    { name: "Mail voting",                  start: [9, 4, 2026],  end: [11, 3, 2026] },
     { name: "Early in-person voting",       start: [9, 14, 2026], end: [11, 3, 2026] },
     { name: "State voter registration deadlines", start: [10, 4, 2026], end: [11, 3, 2026] },
     { name: "Mail ballot receipt deadlines", start: [11, 3, 2026], end: [11, 17, 2026], cls: "post",
@@ -207,7 +209,8 @@
 
   // Full-height reference lines
   const LINES = [
-    { label: "Deadline to mail military & overseas ballots", date: [9, 19, 2026] },
+    // alignLeftNarrow: on charts under NARROW_W wide, the label sits left of its line
+    { label: "Deadline to mail military and overseas ballots", date: [9, 19, 2026], alignLeftNarrow: true },
     { label: "Election Day", date: [11, 3, 2026] },
     { label: "Congress convenes", date: [1, 3, 2027] },
   ];
@@ -290,7 +293,7 @@
     mn.textContent = MONTHS_LONG[d.getMonth()];
     mn.dataset.full = MONTHS_LONG[d.getMonth()];
     mn.dataset.short = MONTHS_SHORT[d.getMonth()];
-    if (d.getMonth() === 0) el("span", "year", m).textContent = d.getFullYear();
+    if (d.getMonth() === 0 || d.getTime() === START.getTime()) el("span", "year", m).textContent = d.getFullYear();
     el("div", "gridline", grid).style.left = pct(d) + "%";
   }
 
@@ -329,17 +332,20 @@
   const LABEL_GAP = 6;    // space between stacked label rows
   const LINE_GAP = 4;     // space between the end of a line and its label
 
-  function addLine(date, label, cls){
+  const NARROW_W = 450;   // chart width below which alignLeftNarrow labels flip to the left of their line
+
+  function addLine(date, label, cls, alignLeftNarrow){
     const p = pct(date);
     if (p < 0 || p > 100) return;
     const line = el("div", "vline" + (cls ? " " + cls : ""), overlay);
     line.style.left = p + "%";
     const t = el("div", "vline-label", line);
+    if (alignLeftNarrow) t.dataset.alignLeftNarrow = "";
     el("span", "date", t).textContent = `${MONTHS_LONG[date.getMonth()]} ${date.getDate()}`;
     el("span", "", t).textContent = label;
   }
 
-  LINES.forEach(l => addLine(toDate(l.date), l.label, l.cls));
+  LINES.forEach(l => addLine(toDate(l.date), l.label, l.cls, l.alignLeftNarrow));
 
   // Stack labels into rows under the chart so none overlap
   // Spell out months unless they would run into each other on a narrow screen
@@ -363,7 +369,9 @@
     const labels = [...overlay.querySelectorAll(".vline-label")];
     const rows = [];  // { right: right edge of last label, h: tallest label }
     const edge = chart.getBoundingClientRect().right;
+    const narrow = chart.getBoundingClientRect().width < NARROW_W;
     labels.forEach(t => {
+      t.classList.toggle("left-of-line", narrow && "alignLeftNarrow" in t.dataset);
       t.parentElement.style.bottom = "0";
       t.style.top = `calc(100% + ${LABEL_TOP}px)`;
       // wrap labels that would run past the right edge of the chart
