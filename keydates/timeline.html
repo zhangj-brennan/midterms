@@ -398,6 +398,7 @@
   // Tell an embedding page how tall this page is, so it can size its iframe to fit (see README-embedding.md).
   (function () {
     if (window.parent === window) return;
+    document.body.style.paddingBottom = "0";  // no blank strip under the sources line when embedded
     const sendHeight = () => {
       const height = Math.ceil(document.body.getBoundingClientRect().bottom + window.scrollY);
       window.parent.postMessage({ type: "keydates-timeline-height", height }, "*");
