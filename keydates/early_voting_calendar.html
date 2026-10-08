@@ -159,7 +159,7 @@
 <body>
 <div id="wrapper">
   <div id="title">Number of States with Early In-Person Voting Available</div>
-  <div id="subtitle">Hover or click over a square to see how many jurisdictions have in-person early voting open on that date.</div>
+  <div id="subtitle">Hover or click over a square to see how many states have in-person early voting open on that date.</div>
 
   <div id="legend"></div>
   <div id="calendar"></div>
@@ -204,7 +204,7 @@
     tip.innerHTML = "";
     el("span", "tipName", tip).textContent = `${WEEKDAYS[d.date.getDay()]}, ${fmtDate(d.date)}`;
     if (d.eday) el("div", "desc", tip).textContent = "Election Day";
-    else el("div", "", tip).textContent = `${plural(d.count, "jurisdiction")} with early voting open`;
+    else el("div", "", tip).textContent = `${plural(d.count, "state")} with early voting open`;
     if (d.peak) el("div", "desc", tip).textContent = "Peak day";
     tip.style.display = "block";
     moveTip(x, y);
@@ -304,7 +304,7 @@
     const legendEl = document.getElementById("legend");
     const legend = el("div", "legendRow", legendEl);
     const markers = el("div", "legendRow", legendEl);
-    el("div", "legendTitle", legend).textContent = "Jurisdictions with early voting open";
+    el("div", "legendTitle", legend).textContent = "States with early voting open";
     // one block per step; labels under the outer edges (1 and the peak) and the dividers between blocks (the thresholds)
     const steps = el("div", "steps", legend);
     BUCKET_COLORS.forEach(c => el("span", "stepSwatch", steps).style.background = c);
