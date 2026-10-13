@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Map Compare: English / Spanish</title>
+<style>
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  body{ margin: 0; padding: 16px; background: #fff; color: #111; font-family: system-ui, sans-serif; }
+  #maps{ display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .col{ flex: 0 1 460px; min-width: 0; }
+  .col h1{ font-family: "BentonStrong", system-ui, sans-serif; font-size: 14px; margin: 0 0 6px; }
+  iframe{ width: 100%; height: 1100px; border: 1px solid #ddd; display: block; }
+</style>
+</head>
+<body>
+<!-- Test page: map.html and map_es.html side by side. Hovering or clicking a state in one map
+     replays the same event on that state in the other, so both popups show together.
+     ?today=YYYY-MM-DD is passed through to both maps. -->
+<div id="maps">
+  <div class="col"><h1>English (map.html)</h1><iframe id="en" title="English map"></iframe></div>
+  <div class="col"><h1>Español (map_es.html)</h1><iframe id="es" title="Spanish map"></iframe></div>
+</div>
+
+<script>
+  const query = location.search;
+  const frames = { en: document.getElementById("en"), es: document.getElementById("es") };
+  frames.en.src = "map.html" + query;
+  frames.es.src = "map_es.html" + query;
+
+  // a map's state tiles, keyed by abbreviation, once it has drawn them
+  const tiles = f => {
+    const doc = f.contentDocument;
+    return doc ? new Map([...doc.querySelectorAll(".state")].map(g => [g.textContent.trim(), g])) : new Map();
+  };
+
+  // relay one real (trusted) event on a tile to the same tile in the other map, at the same spot
+  function relay(event, abbr, to){
+    if (!event.isTrusted) return;  // only the viewer's own events, so relayed ones don't bounce back
+    const target = tiles(to).get(abbr);
+    if (!target) return;
+    target.dispatchEvent(new MouseEvent(event.type, {
+      bubbles: event.bubbles, cancelable: true, clientX: event.clientX, clientY: event.clientY
+    }));
+  }
+
+  function hook(from, to){
+    const tryHook = () => {
+      const t = tiles(from);
+      if (!t.size) return setTimeout(tryHook, 100);  // the map draws after its CSV loads
+      t.forEach((g, abbr) =>
+        ["mouseenter", "mousemove", "mouseleave", "click"].forEach(type =>
+          g.addEventListener(type, e => relay(e, abbr, to))));
+      // a click or tap outside the states closes both popups
+      from.contentDocument.addEventListener("pointerdown", e => {
+        if (!e.isTrusted || e.target.closest(".state, #tooltip")) return;
+        to.contentDocument.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      });
+    };
+    from.addEventListener("load", tryHook);
+  }
+  hook(frames.en, frames.es);
+  hook(frames.es, frames.en);
+  // a click on this page, outside both maps, closes both popups
+  document.addEventListener("pointerdown", () => Object.values(frames).forEach(f =>
+    f.contentDocument && f.contentDocument.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))));
+</script>
+</body>
+</html>

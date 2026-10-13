@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Midterm Key Dates by State</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="load_state_dates_es.js"></script>
+<script src="map_logic_es.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    border-top: 3px solid black;
+  }
+
+  .subtitle{
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+
+  #map svg{
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .state{ cursor: pointer; }
+  .state text{
+    text-anchor: middle;
+    user-select: none;
+    pointer-events: none;
+  }
+  .state .abbr{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+  }
+  .state rect.tile{ fill: #DCDCDC; stroke: #fff; stroke-width: 2; }
+  .state text{ fill: #111; }
+  .state:hover rect.tile{ stroke: #FFD200; stroke-width: 4; }
+  /* states with a key date today */
+  .state.today rect.tile{ fill: #FFD200; }
+  #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
+
+
+  #mapLegend{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 12px;
+    margin-bottom: 24px;
+  }
+  #mapLegend .item{ display: flex; gap: 5px; align-items: flex-start; line-height: 1.35; }
+  #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; flex: none; margin-top: 2px; }
+  #mapLegend .type{ font-family: "BentonStrong", system-ui, sans-serif; }
+  #mapLegend .upNext{ display: block; margin-top: 2px; }
+  #mapLegend .when{ font-family: "BentonStrong", system-ui, sans-serif; }
+
+  #tooltip .stateList{ color: #111; }
+
+  /* hover popup with a state's key dates */
+  #tooltip{
+    position: fixed;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid #111;
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    padding: 10px 12px;
+    font-size: 12px;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    /* when embedded, the frame is only as tall as the page: long popups scroll instead of running off the bottom */
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: none;
+    z-index: 10;
+  }
+  /* clicking a state pins its popup in place so it can be scrolled with the mouse or a swipe */
+  #tooltip.pinned{ pointer-events: auto; }
+  #tooltip .close{
+    display: none;
+    float: right;
+    margin: -6px -6px 0 8px;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    font: 20px/1 system-ui, sans-serif;
+    color: #555;
+    cursor: pointer;
+  }
+  #tooltip.pinned .close{ display: block; }
+  #tooltip h2{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 17px;
+    margin: 0 0 2px;
+  }
+  #tooltip .electionName{ color: #555; margin-bottom: 6px; }
+  #tooltip h3{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 12px;
+    margin: 9px 0 3px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #ddd;
+  }
+  #tooltip h3 .count{ font-family: "Benton", system-ui, sans-serif; }
+  #tooltip ul{ list-style: none; margin: 0; padding: 0; }
+  #tooltip li{ margin: 0 0 3px; line-height: 1.3; }
+  #tooltip .when{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #tooltip .when.past{ color: #888; text-decoration: line-through; }
+  #tooltip .how{ color: #555; }
+  #tooltip .what{ font-family: "BentonMedium", system-ui, sans-serif; }
+  /* state popup: only the date headings stay bold */
+  #tooltip.statePopup h2, #tooltip.statePopup .what{ font-family: "Benton", system-ui, sans-serif; }
+  /* except the in-person early voting / absentee voting begins lines, in red */
+  #tooltip.statePopup .what.earlyVoting{ font-family: "BentonStrong", system-ui, sans-serif; color: #C8102E; }
+  #tooltip h3 .countdown{ background: #FFD200; padding: 1px 5px; margin-left: 6px; }
+  #tooltip h3.past{ color: #888; text-decoration: line-through; }
+  #tooltip .note{ color: #777; font-size: 11px; display: block; }
+
+  #footer{ margin-top: 20px; font-size: 12px; color: #000; }
+  #footer a{ color: #007194; text-decoration: none; }
+  #footer a:hover{ text-decoration: underline; }
+  #footer .label{ font-family: "BentonStrong", system-ui, sans-serif; color: #000; }
+
+  @media (max-width: 700px){
+    body{ padding: 10px; }
+  }
+</style>
+</head>
+
+<body>
+<div id="wrapper">
+  <div class="panel">
+      <div id="title">Key 2026 Election Dates By State</div>
+      <div class="subtitle">Hover over a state to see its key dates.</div>
+      <div id="mapLegend"></div>
+      <div id="map"></div>
+  </div>
+
+  <div id="footer">
+    <span class="label">Source:</span> <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a>,
+    <a href="https://www.vote411.org/" target="_blank">VOTE411</a>,
+    <a href="https://www.ncsl.org/elections-and-campaigns/early-in-person-voting" target="_blank">NCSL</a>
+    and state election offices. Data collected September 24–29, 2026.
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Classic Bostock-style state tile layout, with DC added -->
+<script id="grid" type="text/plain">
+                              ME
+               WI          VT NH
+WA ID MT ND MN IL MI    NY MA
+OR NV WY SD IA IN OH PA NJ CT RI
+CA UT CO NE MO KY WV VA MD DE
+   AZ NM KS AR TN NC SC    DC
+         OK LA MS AL GA
+HI AK    TX             FL
+</script>
+
+<script type="module">
+/* Spanish map: the popup and the date legend show only ES_state_dates_2026.csv's own wording and dates.
+   1. loadStateDates() (load_state_dates_es.js) turns CSV rows into one record per state.
+   2. stateKeyDates()  (map_logic_es.js) picks a state's rows for its popup (same rules as map.html), grouped by date.
+   3. buildEvents()    (map_logic_es.js) picks one date per state per deadline type (same rules as map.html);
+                       the tile shading and the date legend come from these. */
+const { states: STATE_DATES, categories: CATEGORIES } = await loadStateDates();
+// ?today=YYYY-MM-DD overrides the viewer's clock (used by key_dates_test.html)
+const TODAY_PARAM = new URLSearchParams(location.search).get("today");
+const TODAY = /^\d{4}-\d{2}-\d{2}$/.test(TODAY_PARAM || "") ? TODAY_PARAM : d3.timeFormat("%Y-%m-%d")(new Date());
+const CONFIG = {
+  tileSize: 58,
+  tileGapFactor: 1.08
+};
+
+// dates in Spanish: "martes, 3 de noviembre"
+const ES = d3.timeFormatLocale({
+  dateTime: "%A, %e de %B de %Y, %X", date: "%d/%m/%Y", time: "%H:%M:%S", periods: ["a. m.", "p. m."],
+  days: ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"],
+  shortDays: ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"],
+  months: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+  shortMonths: ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+});
+const fmtLong = ES.format("%A, %-d de %B");
+const parse   = d3.timeParse("%Y-%m-%d");
+const long = iso => fmtLong(parse(iso));
+// CSV times: "5:00PM" -> "5 p.m.", "4:30PM" -> "4:30 p.m."
+const fmtTime = t => t.replace(/\b(\d{1,2})(?::(\d\d))?\s*([AaPp])\.?[Mm]\b\.?/g,
+  (m, h, min, ap) => `${h}${min && min !== "00" ? ":" + min : ""} ${ap.toLowerCase()}.m.`);
+
+function parseStateGridText(gridText){
+  const states = [];
+  gridText.split("\n").forEach((line, i) => {
+    const re = /\w+/g;
+    let m;
+    while ((m = re.exec(line))) {
+      states.push({ name: m[0], x: m.index / 3, y: i });
+    }
+  });
+  return states;
+}
+const GRID_STATES = parseStateGridText(document.getElementById("grid").textContent)
+  .filter(d => STATE_DATES[d.name]);
+// drop leading blank rows/columns so the map starts at the top-left
+const minY = d3.min(GRID_STATES, d => d.y), minX = d3.min(GRID_STATES, d => d.x);
+GRID_STATES.forEach(d => { d.y -= minY; d.x -= minX; });
+
+// events indexed by ISO date ("2026-10-05" -> [events])
+const EVENTS_BY_DATE = d3.group(buildEvents(STATE_DATES), d => d.date);
+
+/* ---------- map ---------- */
+function drawMap(){
+  const tileSize = CONFIG.tileSize;
+  const cellSize = Math.round(tileSize * CONFIG.tileGapFactor);
+  const gridWidth = d3.max(GRID_STATES, d => d.x) + 1;
+  const gridHeight = d3.max(GRID_STATES, d => d.y) + 1;
+  const w = gridWidth * cellSize;
+  const h = gridHeight * cellSize;
+
+  const svg = d3.select("#map").append("svg")
+    .attr("viewBox", `0 0 ${w} ${h}`)
+    .attr("role", "img")
+    .attr("aria-label", "Tile map of U.S. states");
+
+  const state = svg.selectAll(".state")
+    .data(GRID_STATES, d => d.name)
+    .enter()
+    .append("g")
+    .attr("class", "state")
+    .attr("transform", d => `translate(${d.x * cellSize + cellSize/2}, ${d.y * cellSize + cellSize/2})`)
+    .on("mouseenter", function(e, d){
+      d3.select(this).raise(); // keep the hover outline above neighboring tiles
+      if (pinned) return; // a pinned popup stays put until it's closed
+      renderPopup(d.name);
+      positionPopup(e);
+    })
+    .on("mousemove", e => { if (!pinned) positionPopup(e); })
+    // click (or tap) pins the popup so it can be scrolled
+    .on("click", (e, d) => {
+      pinned = d.name;
+      renderPopup(d.name);
+      positionPopup(e);
+    })
+    // the popup follows the cursor, so the mouse wheel over a state scrolls a long popup
+    .on("wheel", e => {
+      const tip = document.getElementById("tooltip");
+      if (tip.scrollHeight <= tip.clientHeight) return;
+      e.preventDefault();
+      tip.scrollTop += e.deltaY;
+    })
+    .on("mouseleave", () => {
+      if (!pinned) hidePopup();
+    });
+
+  state.append("rect").attr("class", "tile")
+    .attr("x", -tileSize/2).attr("y", -tileSize/2)
+    .attr("width", tileSize).attr("height", tileSize);
+
+  // fill states that have a key date today; the legend lists them under each CSV category
+  const todayEvs = EVENTS_BY_DATE.get(TODAY) || [];
+  state.classed("today", d => todayEvs.some(e => e.state === d.name));
+  {
+    const it = d3.select("#mapLegend").append("div").attr("class", "item");
+    it.append("span").attr("class", "swatch todayState");
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text(long(TODAY));
+    todayByCategory(todayEvs).forEach(([category, list]) => {
+      const line = txt.append("span").attr("class", "upNext");
+      line.append("span").attr("class", "when").text(`${category}: `);
+      line.append("span").text(list.join(", "));
+    });
+  }
+
+  state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
+}
+
+/* A day's events as [label, state names] pairs in EVENT_TYPES order (map_logic_es.js); the label is the
+   event's categoría plus its begins / ends mark. A registration deadline that covers only some of a
+   state's methods lists them from the CSV: "Luisiana (Por internet)". */
+function todayByCategory(evs){
+  const order = e => EVENT_TYPES.indexOf(e.type);
+  const label = e => e.category + (e.mark ? " " + e.mark : "");
+  return d3.groups([...evs].sort((a, b) => order(a) - order(b)), label).map(([what, list]) => [what, [...new Set(list
+    .sort((a, b) => STATE_DATES[a.state].name.localeCompare(STATE_DATES[b.state].name, "es"))
+    .map(e => {
+      const name = STATE_DATES[e.state].name;
+      return e.type === "registration" && e.rows.length < 3 ? `${name} (${e.rows.map(r => r.label).join(", ")})` : name;
+    }))]]);
+}
+
+function positionPopup(event){
+  const tip = document.getElementById("tooltip");
+  const pad = 14, m = 8;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = event.clientX + pad, y = event.clientY + pad;
+  // flip to the other side of the cursor when it would overflow the viewport
+  if (x + w > window.innerWidth - m) x = event.clientX - pad - w;
+  if (y + h > window.innerHeight - m) y = Math.max(m, window.innerHeight - m - h);
+  tip.style.left = Math.max(m, x) + "px";
+  tip.style.top = y + "px";
+}
+
+let pinned = null; // abbreviation of the state whose popup was clicked open
+function hidePopup(){
+  pinned = null;
+  d3.select("#tooltip").style("display", "none").classed("pinned", false);
+}
+
+// a click or tap anywhere but a state or the popup closes it (touch screens have no mouseleave)
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".state, #tooltip")) hidePopup();
+});
+
+/* ---------- popup ---------- */
+function renderPopup(abbr){
+  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", true)
+    .classed("pinned", !!pinned);
+  panel.node().scrollTop = 0;
+  panel.append("button").attr("class", "close").attr("aria-label", "Cerrar").text("×").on("click", hidePopup);
+  const s = STATE_DATES[abbr];
+  panel.append("h2").text(s.name);
+  if (s.election) panel.append("div").attr("class", "electionName")
+    .text([s.election.trim(), s.electionDate && long(s.electionDate)].filter(Boolean).join(" — "));
+
+  // one heading per date, each row under it as "categoría — etiqueta"; rows with no date at the end
+  const { dated, undated } = stateKeyDates(s);
+  dated.forEach(([date, rows]) => {
+    panel.append("h3").classed("past", date < TODAY).text(long(date));
+    addRows(panel.append("ul"), rows);
+  });
+  if (undated.length) addRows(panel.append("ul").style("margin-top", "9px"), undated);
+
+  if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(s.note);
+}
+
+/* Entries under one date heading (from stateKeyDates), in its order. A single date: one line per categoría,
+   "categoría — etiqueta; etiqueta", each etiqueta with its row's time (or source text for a row with no date).
+   A range: one line per etiqueta, "etiqueta begins" / "etiqueta ends" (categoría if the etiqueta is empty).
+   The rows' notes follow (a range's at its start only). */
+function addRows(ul, entries){
+  // a begins / ends line is titled by its row's etiqueta (else its categoría), so different ranges on one date stay apart
+  const title = e => e.mark ? `${e.row.label || e.row.category} ${e.mark}` : e.row.category;
+  d3.groups(entries, title).forEach(([what, list]) => {
+    const li = ul.append("li");
+    // early voting and in-person absentee voting "begins" lines in red, as on map.html
+    li.append("span").attr("class", "what")
+      .classed("earlyVoting", list[0].mark === "begins" && list[0].row.category === RULES.earlyVoting).text(what);
+    // nothing after a dash on a begins / ends line
+    const how = list[0].mark ? "" : list.map(({ row: i }) => [i.label, i.time && fmtTime(i.time), !(i.date || i.start || i.end) && i.text]
+      .filter(Boolean).join(", ")).filter(Boolean).join("; ");
+    if (how) li.append("span").attr("class", "how").text(" — " + how);
+    // a range's note shows with its start only, as on map.html
+    const notes = [...new Set(list.filter(e => e.mark !== "ends").map(e => e.row.note).filter(Boolean))];
+    if (notes.length) li.append("span").attr("class", "note").text(notes.join(" "));
+  });
+}
+
+drawMap();
+
+/* When embedded in an iframe, tell the parent page how tall the content is, so the embed snippet
+   (README-embedding.md) can size the iframe to fit. The height changes day to day with the length of
+   the date legend, and after web fonts load, so re-send it whenever the content resizes. */
+if (window.parent !== window) {
+  const wrapper = document.getElementById("wrapper");
+  const sendHeight = () => {
+    const bottom = wrapper.getBoundingClientRect().bottom + window.scrollY;
+    const height = Math.ceil(bottom + parseFloat(getComputedStyle(document.body).paddingBottom));
+    window.parent.postMessage({ type: "keydates-map-height", height }, "*");
+  };
+  new ResizeObserver(sendHeight).observe(wrapper);
+  window.addEventListener("load", sendHeight);
+}
+</script>
+</body>
+</html>
