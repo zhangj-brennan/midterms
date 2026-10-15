@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Midterm Key Dates by State</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="load_state_dates.js"></script>
+<script src="map_logic.js"></script>
+<style>
+  @font-face { font-family: "Benton"; src: url("../Benton Sans/Benton Sans Book.otf"); }
+  @font-face { font-family: "BentonStrong"; src: url("../Benton Sans/Benton Sans Bold.otf"); }
+  @font-face { font-family: "BentonMedium"; src: url("../Benton Sans/Benton Sans Medium.otf"); }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    padding: 16px;
+    background: #fff;
+    color: #111;
+    font-family: "Benton", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #wrapper{
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  #title{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 18px;
+    padding: 10px 0 4px;
+    border-top: 3px solid black;
+  }
+
+  .subtitle{
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+
+  #map svg{
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .state{ cursor: pointer; }
+  .state text{
+    text-anchor: middle;
+    user-select: none;
+    pointer-events: none;
+  }
+  .state .abbr{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+  }
+  .state rect.tile{ fill: #DCDCDC; stroke: #fff; stroke-width: 2; }
+  .state text{ fill: #111; }
+  .state:hover rect.tile{ stroke: #FFD200; stroke-width: 4; }
+  /* states with a key date today */
+  .state.today rect.tile{ fill: #FFD200; }
+  #mapLegend .swatch.todayState{ background: #FFD200; border: none; }
+  /* states with a key date tomorrow (when "Show tomorrow" is checked); today's yellow wins */
+  .state.tomorrow:not(.today) rect.tile{ fill: #FFEC99; }
+  #mapLegend .swatch.tomorrowState{ background: #FFEC99; border: none; }
+  #mapLegend .toggle{ flex-basis: 100%; display: flex; gap: 5px; align-items: center; cursor: pointer; }
+  /* square checkbox, same 12px size and left edge as the legend swatches */
+  #mapLegend .toggle input{
+    appearance: none; -webkit-appearance: none;
+    width: 12px; height: 12px; margin: 0; flex: none;
+    border: 1px solid #111; border-radius: 0; background: #fff; cursor: pointer;
+  }
+  #mapLegend .toggle input:checked{
+    background: #111 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='%23fff' stroke-width='1.8'/%3E%3C/svg%3E") center / 10px no-repeat;
+  }
+  #mapLegend .toggle input:focus-visible{ outline: 2px solid #007194; outline-offset: 1px; }
+  #mapLegend .tomorrowItem{ flex-basis: 100%; }
+
+
+  #mapLegend{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 12px;
+    margin-bottom: 24px;
+  }
+  #mapLegend .item{ display: flex; gap: 5px; align-items: flex-start; line-height: 1.35; }
+  #mapLegend .swatch{ width: 12px; height: 12px; border: 1px solid #ddd; flex: none; margin-top: 2px; }
+  #mapLegend .type{ font-family: "BentonStrong", system-ui, sans-serif; }
+  #mapLegend .upNext{ display: block; margin-top: 2px; }
+  #mapLegend .when{ font-family: "BentonStrong", system-ui, sans-serif; }
+
+  #tooltip .stateList{ color: #111; }
+
+  /* hover popup with a state's key dates */
+  #tooltip{
+    position: fixed;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid #111;
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    padding: 10px 12px;
+    font-size: 12px;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    /* when embedded, the frame is only as tall as the page: long popups scroll instead of running off the bottom */
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: none;
+    z-index: 10;
+  }
+  /* clicking a state pins its popup in place so it can be scrolled with the mouse or a swipe */
+  #tooltip.pinned{ pointer-events: auto; }
+  #tooltip .close{
+    display: none;
+    float: right;
+    margin: -6px -6px 0 8px;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    font: 20px/1 system-ui, sans-serif;
+    color: #555;
+    cursor: pointer;
+  }
+  #tooltip.pinned .close{ display: block; }
+  #tooltip h2{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 17px;
+    margin: 0 0 2px;
+  }
+  #tooltip .electionName{ color: #555; margin-bottom: 6px; }
+  #tooltip h3{
+    font-family: "BentonStrong", system-ui, sans-serif;
+    font-size: 12px;
+    margin: 9px 0 3px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #ddd;
+  }
+  #tooltip h3 .count{ font-family: "Benton", system-ui, sans-serif; }
+  #tooltip ul{ list-style: none; margin: 0; padding: 0; }
+  #tooltip li{ margin: 0 0 3px; line-height: 1.3; }
+  #tooltip .when{ font-family: "BentonMedium", system-ui, sans-serif; }
+  #tooltip .when.past{ color: #888; text-decoration: line-through; }
+  #tooltip .how{ color: #555; }
+  #tooltip .what{ font-family: "BentonMedium", system-ui, sans-serif; }
+  /* state popup: only the date headings stay bold */
+  #tooltip.statePopup h2, #tooltip.statePopup .what{ font-family: "Benton", system-ui, sans-serif; }
+  /* except the in-person early voting / absentee voting begins lines, in red */
+  #tooltip.statePopup .what.earlyVoting{ font-family: "BentonStrong", system-ui, sans-serif; color: #C8102E; }
+  #tooltip h3 .countdown{ background: #FFD200; padding: 1px 5px; margin-left: 6px; }
+  #tooltip h3.past{ color: #888; text-decoration: line-through; }
+  #tooltip .note{ color: #777; font-size: 11px; display: block; }
+
+  #footer{ margin-top: 20px; font-size: 12px; color: #000; }
+  #footer a{ color: #007194; text-decoration: none; }
+  #footer a:hover{ text-decoration: underline; }
+  #footer .label{ font-family: "BentonStrong", system-ui, sans-serif; color: #000; }
+
+  @media (max-width: 700px){
+    body{ padding: 10px; }
+  }
+</style>
+</head>
+
+<body>
+<div id="wrapper">
+  <div class="panel">
+      <div id="title">Key 2026 Election Dates By State</div>
+      <div class="subtitle">Hover over a state to see its key dates.</div>
+      <div id="mapLegend"></div>
+      <div id="map"></div>
+  </div>
+
+  <div id="footer">
+    <span class="label">Source:</span> <a href="https://www.usvotefoundation.org/state-election-dates-and-deadlines" target="_blank">U.S. Vote Foundation</a>,
+    <a href="https://www.vote411.org/" target="_blank">VOTE411</a>,
+    <a href="https://www.ncsl.org/elections-and-campaigns/early-in-person-voting" target="_blank">NCSL</a>
+    and state election offices. Data collected September 24–29, 2026.
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Classic Bostock-style state tile layout, with DC added -->
+<script id="grid" type="text/plain">
+                              ME
+               WI          VT NH
+WA ID MT ND MN IL MI    NY MA
+OR NV WY SD IA IN OH PA NJ CT RI
+CA UT CO NE MO KY WV VA MD DE
+   AZ NM KS AR TN NC SC    DC
+         OK LA MS AL GA
+HI AK    TX             FL
+</script>
+
+<script type="module">
+/* =========================================================
+   CONFIG
+========================================================= */
+/* Data flow, CSV -> map:
+     1. loadStateDates() (load_state_dates.js) turns CSV rows into one record per state.
+     2. stateKeyDates()  (map_logic.js) turns a state's record into the lines of its hover popup (nearly every row).
+     3. buildEvents()    (map_logic.js) turns every state's record into one-date-per-type events; the tile
+                         shading and the "Today" legend come only from these.
+   mapcheck.html runs the same map_logic.js on the same CSV and lists the result next to each CSV row.
+   So a date can be in the CSV and in the popup but not drive the shading (see buildEvents for the rules). */
+// key dates by state, from state_dates_2026.csv (module script, so top-level await works)
+const STATE_DATES = await loadStateDates();
+const ELECTION_DAY = "2026-11-03";
+// ?today=YYYY-MM-DD overrides the viewer's clock (used by key_dates_test.html)
+const TODAY_PARAM = new URLSearchParams(location.search).get("today");
+const TODAY = /^\d{4}-\d{2}-\d{2}$/.test(TODAY_PARAM || "") ? TODAY_PARAM : d3.timeFormat("%Y-%m-%d")(new Date());
+const CONFIG = {
+  tileSize: 58,
+  tileGapFactor: 1.08
+};
+/* ======================================================= */
+
+const fmtShort = d3.timeFormat("%B %-d");      // October 5
+const fmtLong  = d3.timeFormat("%A, %B %-d");  // Monday, October 5
+const parse    = d3.timeParse("%Y-%m-%d");
+const long  = iso => fmtLong(parse(iso));
+
+/* Spell out the source's abbreviated dates and weekdays: "Sun Oct 25" -> "Sunday, October 25",
+   "Oct 26th" -> "October 26". Weekdays attached to a date are recomputed from the 2026 date.
+   Times become a.m./p.m. with a space, ":00" dropped: "5:00PM" / "5 PM" -> "5 p.m.", "4:30PM" -> "4:30 p.m.",
+   "12:00PM" -> "noon". */
+const MONTH_ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = { Sun: "Sunday", Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday" };
+function spellDates(t){
+  return t
+    .replace(/\b(?:(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*,?\s+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/g,
+      (m, wd, mon, day) => (wd ? fmtLong : fmtShort)(new Date(2026, MONTH_ABBRS.indexOf(mon), +day)))
+    .replace(/\b(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\b/g, w => WEEKDAYS[w])
+    .replace(/\b(\d{1,2})(?::(\d\d))?\s*([AaPp])\.?[Mm]\b\.?/g, (m, h, min, ap) =>
+      +h === 12 && (!min || min === "00") && /p/i.test(ap) ? "noon"
+        : `${h}${min && min !== "00" ? ":" + min : ""} ${ap.toLowerCase()}.m.`);
+}
+
+/* Sentence case for popup text: every word lowercased except Election Day, state names, and the
+   months and weekdays spellDates() writes out ("May" left out, since it's also the verb). With
+   keepStarts, a word that opens the text or a sentence keeps its case (notes); without it, the
+   text follows " — " and is all lowercase (labels). Run after spellDates(). */
+const KEEP_CAPS = ["Election Day", ...Object.values(STATE_DATES).map(s => s.name),
+  "January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December",
+  ...Object.values(WEEKDAYS)];
+const KEEP_CAPS_BY_LOWER = new Map(KEEP_CAPS.map(w => [w.toLowerCase(), w]));
+// longest first, so "West Virginia" wins over "Virginia"
+const KEEP_CAPS_RE = new RegExp(`\\b(${[...KEEP_CAPS].sort((a, b) => b.length - a.length).join("|")})\\b`, "gi");
+function sentenceCase(t, keepStarts){
+  return t
+    .replace(/[A-Za-z][A-Za-z']*/g, (w, i) =>
+      keepStarts && (i === 0 || /[.!?]\s+$/.test(t.slice(0, i))) ? w : w.toLowerCase())
+    .replace(KEEP_CAPS_RE, m => KEEP_CAPS_BY_LOWER.get(m.toLowerCase()));
+}
+
+function parseStateGridText(gridText){
+  const states = [];
+  gridText.split("\n").forEach((line, i) => {
+    const re = /\w+/g;
+    let m;
+    while ((m = re.exec(line))) {
+      states.push({ name: m[0], x: m.index / 3, y: i });
+    }
+  });
+  return states;
+}
+const GRID_STATES = parseStateGridText(document.getElementById("grid").textContent)
+  .filter(d => STATE_DATES[d.name]);
+// drop leading blank rows/columns so the map starts at the top-left
+const minY = d3.min(GRID_STATES, d => d.y), minX = d3.min(GRID_STATES, d => d.x);
+GRID_STATES.forEach(d => { d.y -= minY; d.x -= minX; });
+
+/* ---------- map ---------- */
+function drawMap(){
+  const tileSize = CONFIG.tileSize;
+  const cellSize = Math.round(tileSize * CONFIG.tileGapFactor);
+  const gridWidth = d3.max(GRID_STATES, d => d.x) + 1;
+  const gridHeight = d3.max(GRID_STATES, d => d.y) + 1;
+  const w = gridWidth * cellSize;
+  const h = gridHeight * cellSize;
+
+  const svg = d3.select("#map").append("svg")
+    .attr("viewBox", `0 0 ${w} ${h}`)
+    .attr("role", "img")
+    .attr("aria-label", "Tile map of U.S. states");
+
+  const state = svg.selectAll(".state")
+    .data(GRID_STATES, d => d.name)
+    .enter()
+    .append("g")
+    .attr("class", "state")
+    .attr("transform", d => `translate(${d.x * cellSize + cellSize/2}, ${d.y * cellSize + cellSize/2})`)
+    .on("mouseenter", function(e, d){
+      d3.select(this).raise(); // keep the hover outline above neighboring tiles
+      if (pinned) return; // a pinned popup stays put until it's closed
+      renderPopup(d.name);
+      positionPopup(e);
+    })
+    .on("mousemove", e => { if (!pinned) positionPopup(e); })
+    // click (or tap) pins the popup so it can be scrolled
+    .on("click", (e, d) => {
+      pinned = d.name;
+      renderPopup(d.name);
+      positionPopup(e);
+    })
+    // the popup follows the cursor, so the mouse wheel over a state scrolls a long popup
+    .on("wheel", e => {
+      const tip = document.getElementById("tooltip");
+      if (tip.scrollHeight <= tip.clientHeight) return;
+      e.preventDefault();
+      tip.scrollTop += e.deltaY;
+    })
+    .on("mouseleave", () => {
+      if (!pinned) hidePopup();
+    });
+
+  state.append("rect").attr("class", "tile")
+    .attr("x", -tileSize/2).attr("y", -tileSize/2)
+    .attr("width", tileSize).attr("height", tileSize);
+  // fill states that have a key date today. Everything below reads the events from buildEvents()
+  // (one date per state per deadline type), never the full per-state lists the popup uses.
+  const eventsOn = iso => (EVENTS_BY_DATE.get(iso) || []).filter(e => e.type !== "Election Day");
+  const todayEvs = eventsOn(TODAY);
+  const todayStates = new Set(todayEvs.map(e => e.state));
+  state.classed("today", d => todayStates.has(d.name));
+  const todayTypes = todayByType(todayEvs, true);
+  {
+    const it = d3.select("#mapLegend").append("div").attr("class", "item");
+    it.append("span").attr("class", "swatch todayState");
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text(`Today (${long(TODAY)}): `);
+    if (!todayTypes.length) txt.append("span").text("No key dates");
+    todayTypes.forEach(([t, list]) => {
+      const line = txt.append("span").attr("class", "upNext");
+      line.append("span").attr("class", "when").text(`${t}: `);
+      line.append("span").text(list.join(", "));
+    });
+  }
+
+  // "Show tomorrow": highlight states with a key date the day after TODAY, with its own list
+  {
+    const TOMORROW = fmtISO(d3.timeDay.offset(parse(TODAY), 1));
+    const tomorrowEvs = eventsOn(TOMORROW);
+    const tomorrowStates = new Set(tomorrowEvs.map(e => e.state));
+    const legend = d3.select("#mapLegend");
+    const toggle = legend.append("label").attr("class", "toggle");
+    const box = toggle.append("input").attr("type", "checkbox");
+    toggle.append("span").text("Show tomorrow");
+    const it = legend.append("div").attr("class", "item tomorrowItem").style("display", "none");
+    it.append("span").attr("class", "swatch tomorrowState");
+    const txt = it.append("span");
+    txt.append("span").attr("class", "type").text(`Tomorrow (${long(TOMORROW)}): `);
+    const tomorrowTypes = todayByType(tomorrowEvs, true);
+    if (!tomorrowTypes.length) txt.append("span").text("No key dates");
+    tomorrowTypes.forEach(([t, list]) => {
+      const line = txt.append("span").attr("class", "upNext");
+      line.append("span").attr("class", "when").text(`${t}: `);
+      line.append("span").text(list.join(", "));
+    });
+    box.on("change", function(){
+      state.classed("tomorrow", d => this.checked && tomorrowStates.has(d.name));
+      it.style("display", this.checked ? null : "none");
+    });
+  }
+
+  state.append("text").attr("class", "abbr").attr("dy", ".35em").attr("dx", 0.5).text(d => d.name); // dx offsets the trailing letter-spacing so labels stay centered
+}
+
+function positionPopup(event){
+  const tip = document.getElementById("tooltip");
+  const pad = 14, m = 8;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = event.clientX + pad, y = event.clientY + pad;
+  // flip to the other side of the cursor when it would overflow the viewport
+  if (x + w > window.innerWidth - m) x = event.clientX - pad - w;
+  if (y + h > window.innerHeight - m) y = Math.max(m, window.innerHeight - m - h);
+  tip.style.left = Math.max(m, x) + "px";
+  tip.style.top = y + "px";
+}
+
+let pinned = null; // abbreviation of the state whose popup was clicked open
+function hidePopup(){
+  pinned = null;
+  d3.select("#tooltip").style("display", "none").classed("pinned", false);
+}
+
+// a click or tap anywhere but a state or the popup closes it (touch screens have no mouseleave)
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".state, #tooltip")) hidePopup();
+});
+
+/* ---------- popup ---------- */
+function renderPopup(abbr){
+  const panel = d3.select("#tooltip").html("").style("display", "block").classed("statePopup", true)
+    .classed("pinned", !!pinned);
+  panel.node().scrollTop = 0;
+  panel.append("button").attr("class", "close").attr("aria-label", "Close").text("×").on("click", hidePopup);
+  const s = STATE_DATES[abbr];
+  panel.append("h2").text(s.name);
+  panel.append("div").attr("class", "electionName").text(s.election + " — " + long(ELECTION_DAY));
+
+  const { dated, undated } = stateKeyDates(s, ELECTION_DAY);
+  const byDate = d3.groups(dated, e => e.date).sort(([a], [b]) => d3.ascending(a, b));
+  const next = (byDate.find(([date]) => date >= TODAY) || [])[0];
+  byDate.forEach(([date, evs]) => {
+    const h = panel.append("h3").classed("past", date < TODAY).text(long(date));
+    // countdown to the state's next key date
+    if (date === next) {
+      const n = d3.timeDay.count(parse(TODAY), parse(date));
+      h.append("span").attr("class", "countdown")
+        .text(n === 0 ? "Today" : `In ${n} day${n === 1 ? "" : "s"}`);
+    }
+    const ul = panel.append("ul");
+    // Election Day leads its date, then in-person early voting, then in-person absentee voting; repeats of the same deadline merge into one line
+    const rank = what => what === "Election Day" ? 0 : /early voting/i.test(what) ? 1 : /absentee voting/i.test(what) ? 2 : 3;
+    d3.groups(evs, e => e.what)
+      .sort(([a], [b]) => rank(a) - rank(b))
+      .forEach(([what, rows]) => addKeyDate(ul, {
+        what,
+        how: rows.map(r => [r.how, r.time].filter(Boolean).join(", "))
+          .filter(Boolean).join("; "),
+        note: rows.map(r => r.note).filter(Boolean).join(" ")
+      }));
+  });
+  if (undated.length) {
+    panel.append("h3").text("Other");
+    const ul = panel.append("ul");
+    undated.forEach(e => addKeyDate(ul, e));
+  }
+
+  if (s.note) panel.append("div").attr("class", "note").style("margin-top", "8px").text(sentenceCase(spellDates(s.note), true));
+}
+
+/* stateKeyDates() — which CSV rows become which popup lines — is in map_logic.js. */
+function addKeyDate(ul, e){
+  const li = ul.append("li");
+  li.append("span").attr("class", "what").classed("earlyVoting", /^In-person (early|absentee) voting begins$/.test(e.what)).text(e.what);
+  const bits = [e.how, e.text].filter(Boolean);
+  if (bits.length) li.append("span").attr("class", "how").text(" — " + sentenceCase(spellDates(bits.join(", "))));
+  if (e.note) li.append("span").attr("class", "note").text(sentenceCase(spellDates(e.note), true));
+}
+
+/* EVENT_TYPES and buildEvents() — the one-date-per-type events behind the shading — are in map_logic.js. */
+// events indexed by ISO date ("2026-10-05" -> [events]) for the today lookups
+const EVENTS_BY_DATE = d3.group(buildEvents(STATE_DATES, ELECTION_DAY), d => d.date);
+const fmtISO = d3.timeFormat("%Y-%m-%d");
+
+function dayInfo(iso){
+  const evs = EVENTS_BY_DATE.get(iso) || [];
+  // Election Day itself doesn't count
+  const states = new Set(evs.filter(e => e.type !== "Election Day").map(e => e.state));
+  return { evs, states, n: states.size };
+}
+
+/* A day's events as [type, state labels] pairs in EVENT_TYPES order, Election Day left out.
+   fullNames labels states by name instead of abbreviation. */
+function todayByType(evs, fullNames){
+  const byType = d3.group(evs, e => e.type);
+  const label = abbr => fullNames ? STATE_DATES[abbr].name : abbr;
+  return EVENT_TYPES.filter(t => byType.has(t) && t !== "Election Day").map(t => [t,
+    byType.get(t)
+      .sort((a, b) => STATE_DATES[a.state].name.localeCompare(STATE_DATES[b.state].name))
+      .map(e => e.detail && t === "Registration deadline" && e.detail !== "online, mail, in person"
+        ? `${label(e.state)} (${e.detail})` : label(e.state))
+  ]);
+}
+
+drawMap();
+
+/* When embedded in an iframe, tell the parent page how tall the content is, so the embed snippet
+   (README-embedding.md) can size the iframe to fit. The height changes day to day with the length of
+   the "Today" legend, and after web fonts load, so re-send it whenever the content resizes. */
+if (window.parent !== window) {
+  const wrapper = document.getElementById("wrapper");
+  const sendHeight = () => {
+    const bottom = wrapper.getBoundingClientRect().bottom + window.scrollY;
+    const height = Math.ceil(bottom + parseFloat(getComputedStyle(document.body).paddingBottom));
+    window.parent.postMessage({ type: "keydates-map-height", height }, "*");
+  };
+  new ResizeObserver(sendHeight).observe(wrapper);
+  window.addEventListener("load", sendHeight);
+}
+</script>
+</body>
+</html>
