@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Changes in recently redrawn states</title>
+<title>House seat changes in states that redrew districts</title>
 <!--
   Subtitle: Toggle each state between its true geographic shape and an
   equal-area tile in a 51-cell grid, so no state's visual weight depends
@@ -82,14 +82,16 @@
   // ==========================================================================
   const CONFIG = {
     // Page text
-    pageTitle: "Changes in recently redrawn states",
+    pageTitle: "House seat changes in states that redrew districts",
     sourceHtml: "<strong>Source:</strong> Brennan Center analysis.",
 
     // Data — one row per state. All values (names, deltas, and the
     // legend's range) come from this file; nothing is hardcoded here.
     // Column headers are mapped so a differently-shaped CSV can be dropped in.
-    dataCsvPath: "temp.csv",
-    dataColumns: { name: "NAME", delta: "Delta House", abbr: "Abbr", flip: "Flip House" },
+    // Delta is a plain seat count; Party (D/R/I) says who gained. Redrawn
+    // states with no change use Delta 0 and Party NA. Flip column optional.
+    dataCsvPath: "house.csv",
+    dataColumns: { name: "NAME", abbr: "Abbr", delta: "Delta", party: "Party", flip: "Flip" },
 
     // Tooltip wording: "Added {n} {party} {seat|seats}"
     unitSingular: "seat",
@@ -98,18 +100,18 @@
 
     // One flat color each for gains, losses, and no change, plus "no data".
     // Legend labels for each group (only groups present in the data show).
-    legendLabels: { negative: "Democratic gain", mid: "Redrawn, no change in seats", positive: "Republican gain", none: "Not redrawn" },
-    // Suffix on each number: positive deltas → "+3R", negative → "+2D".
-    partyLabels: { negative: "D", positive: "R" },
+    legendLabels: { negative: "Democratic gain", mid: "Redrawn, no change in seats", positive: "Republican gain", independent: "Independent gain", none: "Not redrawn" },
+    // Suffix on each number: "+3R", "+2D", "+1I".
+    partyLabels: { negative: "D", positive: "R", independent: "I" },
 
     // States with TRUE in the flip column get subtle diagonal stripes in a
     // lighter shade of their party color, a "Flipped to …" legend item, and
     // a line in the tooltip. Direction comes from the sign of the delta.
-    flipLabels: { negative: "Flipped to Democratic", positive: "Flipped to Republican" },
-    stripeColors: { negative: "#007194", positive: "#ed1c24", mid: "#d3d3d3" },
+    flipLabels: { negative: "Flipped to Democratic", positive: "Flipped to Republican", independent: "Flipped to Independent" },
+    stripeColors: { negative: "#007194", positive: "#ed1c24", independent: "#8a6fbf", mid: "#d3d3d3" },
     stripe: { size: 8, width: 3 },
     // Spelled-out party names for the tooltip: "Added 3 Republican seats".
-    partyNames: { negative: "Democratic", positive: "Republican" },
+    partyNames: { negative: "Democratic", positive: "Republican", independent: "Independent" },
 
     // TEMPORARY: show "+0" under no-change states (in the CSV with 0), to check label
     // spacing and placement. Set to false before publishing.
@@ -118,6 +120,7 @@
       negative: "#00415b",
       mid: "#bdbdbd",
       positive: "#9e0b0f",
+      independent: "#5b3f8c",
       none: "#ededed"
     }
   };
@@ -217,24 +220,25 @@
 
   const cols = CONFIG.dataColumns;
   const DATA = {};
+  const PARTY_KEY = { D: "negative", R: "positive", I: "independent" };
   dataRows.forEach(r => {
     const abbr = (r[cols.abbr] || "").trim();
     if (!abbr) return;
-    const delta = parseFloat(r[cols.delta]);
+    const parsed = parseFloat(r[cols.delta]);
+    const delta = Number.isNaN(parsed) ? null : Math.abs(parsed);
+    const party = (r[cols.party] || "").trim().toUpperCase();
     DATA[abbr] = {
       name: (r[cols.name] || "").trim(),
-      delta: Number.isNaN(delta) ? null : delta,
+      delta,
+      // Party picks the color group; 0 (or no party) is "redrawn, no change".
+      key: delta == null ? null : delta === 0 ? "mid" : (PARTY_KEY[party] || "mid"),
       flip: /^(true|yes|y|1)$/i.test((r[cols.flip] || "").trim())
     };
   });
 
-  // Sign of the delta picks the color: + / − / no change.
-  const signKey = v => v > 0 ? "positive" : v < 0 ? "negative" : "mid";
-  const colorScale = v => CONFIG.colors[signKey(v)];
-  const deltas = Object.values(DATA).map(d => d.delta).filter(v => v != null);
+  const keys = Object.values(DATA).map(d => d.key).filter(k => k != null);
 
-  // Positive deltas are Republican gains, negative are Democratic gains.
-  const fmtDelta = v => v > 0 ? `+${v}${CONFIG.partyLabels.positive}` : v < 0 ? `+${-v}${CONFIG.partyLabels.negative}` : "0";
+  const fmtDelta = d => d.key === "mid" ? "0" : `+${d.delta}${CONFIG.partyLabels[d.key]}`;
   const unitWord = v => Math.abs(v) === 1 ? CONFIG.unitSingular : CONFIG.unitPlural;
 
   const objectKey = topo.objects.states ? "states" : Object.keys(topo.objects)[0];
@@ -286,7 +290,8 @@
       delta: DATA[abbr] ? DATA[abbr].delta : null,
       hasData: !!DATA[abbr] && DATA[abbr].delta != null,
       flip: !!DATA[abbr] && DATA[abbr].flip,
-      fill: DATA[abbr] && DATA[abbr].delta != null ? colorScale(DATA[abbr].delta) : CONFIG.colors.none,
+      key: DATA[abbr] ? DATA[abbr].key : null,
+      fill: DATA[abbr] && DATA[abbr].key != null ? CONFIG.colors[DATA[abbr].key] : CONFIG.colors.none,
       geoD, fullGeoD, gridD,
       geoC, gridC, labelGeoC,
       small: CALLOUT_STATES.includes(abbr),
@@ -322,7 +327,7 @@
     }
     return `url(#${stripeIds.get(key)})`;
   }
-  states.forEach(d => { if (d.flip && d.hasData) d.fill = stripeFill(signKey(d.delta)); });
+  states.forEach(d => { if (d.flip && d.hasData) d.fill = stripeFill(d.key); });
 
   const gStates = svg.append("g");
   const gLines = svg.append("g");
@@ -332,9 +337,9 @@
 
   function tooltipHtml(d) {
     if (!d.hasData) return `<strong>${d.name}</strong><br><span class="sub">${CONFIG.noDataLabel}</span>`;
-    const party = d.delta > 0 ? CONFIG.partyNames.positive : CONFIG.partyNames.negative;
-    const deltaText = d.delta === 0 ? CONFIG.legendLabels.mid : `Added ${Math.abs(d.delta)} ${party} ${unitWord(d.delta)}`;
-    const flipLabel = d.flip && d.hasData ? CONFIG.flipLabels[signKey(d.delta)] : null;
+    const party = CONFIG.partyNames[d.key];
+    const deltaText = d.key === "mid" ? CONFIG.legendLabels.mid : `Added ${d.delta} ${party} ${unitWord(d.delta)}`;
+    const flipLabel = d.flip && d.hasData ? CONFIG.flipLabels[d.key] : null;
     const flipText = flipLabel ? `<br><span class="sub">${flipLabel}</span>` : "";
     return `<strong>${d.name}</strong><br><span class="sub">${deltaText}</span>${flipText}`;
   }
@@ -457,7 +462,7 @@
   // to check label spacing and placement.
   const hasChange = d => d.hasData && d.delta !== 0;
   const showsNumber = d => hasChange(d) || (CONFIG.showPlaceholderLabels && d.hasData);
-  const numberText = d => hasChange(d) ? fmtDelta(d.delta) : "+0";
+  const numberText = d => hasChange(d) ? fmtDelta(d) : "+0";
   const CARTO_DELTA_DY = "0.6em";
   [normalLabels, smallInteriorLabels].forEach(sel => {
     sel.filter(showsNumber)
@@ -509,7 +514,7 @@
     .style("text-shadow", d => d.hasData && d.delta !== 0 ? "none" : "0 0 3px rgba(255,255,255,0.75)")
     .style("fill", d => !d.hasData ? "#b0b0b0"
       : d.delta === 0 ? "#767c7d"
-      : CONFIG.colors[signKey(d.delta)]);
+      : CONFIG.colors[d.key]);
 
   const toggleBtn = document.getElementById("toggle");
   const labelGeo = document.getElementById("labelGeo");
@@ -562,12 +567,12 @@
   // ---- Legend -----------------------------------------------------------
   // One swatch per group (gain / no change / loss) that appears in the data.
   const legendBucketsEl = document.getElementById("legendBuckets");
-  const presentKeys = new Set(deltas.map(signKey));
+  const presentKeys = new Set(keys);
   // States missing from the CSV count as "not redrawn".
   if (states.some(d => !d.hasData)) presentKeys.add("none");
   // Laid out as a grid: color items in row 1, each "Flipped to …" item in
   // row 2 directly under the matching party's color item.
-  const mainKeys = ["positive", "negative", "mid", "none"].filter(k => presentKeys.has(k));
+  const mainKeys = ["positive", "negative", "independent", "mid", "none"].filter(k => presentKeys.has(k));
   legendBucketsEl.classList.add("legend-buckets--grid");
   legendBucketsEl.style.gridTemplateColumns = `repeat(${mainKeys.length}, auto)`;
   mainKeys.forEach((k, i) => {
@@ -585,8 +590,8 @@
   });
 
   // One "Flipped to …" item per direction that appears in the data.
-  const flipKeys = new Set(states.filter(d => d.flip && d.hasData && d.delta !== 0).map(d => signKey(d.delta)));
-  ["positive", "negative"].filter(k => flipKeys.has(k) && mainKeys.includes(k)).forEach(k => {
+  const flipKeys = new Set(states.filter(d => d.flip && d.hasData && d.delta !== 0).map(d => d.key));
+  ["positive", "negative", "independent"].filter(k => flipKeys.has(k) && mainKeys.includes(k)).forEach(k => {
     const bucket = document.createElement("div");
     bucket.style.gridRow = 2;
     bucket.style.gridColumn = mainKeys.indexOf(k) + 1;
@@ -629,7 +634,7 @@
   // cleanly over borders and small, busy shapes.
   function applyLabelShadows() {
     svg.selectAll("g.state-label text").style("text-shadow", d => {
-      const base = d.hasData ? CONFIG.colors[signKey(d.delta)] : CONFIG.colors.none;
+      const base = d.hasData ? CONFIG.colors[d.key] : CONFIG.colors.none;
       // Tight outline: 1px offsets on all sides with almost no blur.
       return [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
         .map(([x, y]) => `${x}px ${y}px 0.5px ${base}`).join(", ");
