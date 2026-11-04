@@ -513,10 +513,10 @@
     .style("fill", "#fff")
     .style("text-shadow", "none");
 
-  // Gray states: dark gray labels for no change, lighter for not redrawn.
+  // Black labels for no change (yellow), light gray for not redrawn.
   svg.selectAll("g.state-label text")
     .filter(d => d.hasData && d.delta === 0)
-    .style("fill", "#767c7d");
+    .style("fill", "#000");
   svg.selectAll("g.state-label text")
     .filter(d => !d.hasData)
     .style("fill", "#b0b0b0");
@@ -527,12 +527,12 @@
   callouts.selectAll("text")
     .style("text-shadow", d => d.hasData && d.delta !== 0 ? "none" : "0 0 3px rgba(255,255,255,0.75)")
     .style("fill", d => !d.hasData ? "#b0b0b0"
-      : d.delta === 0 ? "#767c7d"
+      : d.delta === 0 ? "#000"
       : CONFIG.colors[d.key]);
 
   // Leader lines match their side label's color.
   calloutLines.style("stroke", d => !d.hasData ? "#b0b0b0"
-    : d.key === "mid" ? "#767c7d"
+    : d.key === "mid" ? "#000"
     : CONFIG.colors[d.key]);
 
   // When the map is drawn small, the NH and RI labels crowd their neighbors,
@@ -542,7 +542,7 @@
   const isPopout = () => svg.node().getBoundingClientRect().width < POPOUT_BELOW_PX;
   const popoutStates = states.filter(d => POPOUT_STATES.includes(d.abbr));
   const popoutAnchor = d => [CALLOUT_X, d.geoC[1]];
-  const sideLabelColor = d => !d.hasData ? "#b0b0b0" : d.key === "mid" ? "#767c7d" : CONFIG.colors[d.key];
+  const sideLabelColor = d => !d.hasData ? "#b0b0b0" : d.key === "mid" ? "#000" : CONFIG.colors[d.key];
 
   const popoutLines = gLines.selectAll("line.popout-line")
     .data(popoutStates, d => d.id)
