@@ -578,23 +578,29 @@
   const labelGeo = document.getElementById("labelGeo");
   const labelCarto = document.getElementById("labelCarto");
 
-  // On mobile the 11-column grid only spans ~73% of the width, so the
-  // cartogram is zoomed until the grid fills the width, and the drawing
-  // grows taller to fit it. Eases in with the geo→cartogram morph.
+  // On mobile both views are zoomed to use more of the width; the drawing's
+  // height follows. Geo: crop to x = GEO_CROP_X (drops the empty band kept
+  // for desktop side labels, plus the tips of the Aleutians). Cartogram:
+  // the 11-column grid (~73% of the width) fills the width. The zoom eases
+  // between the two with the geo→cartogram morph.
   const CARTO_PAD = 4;
+  const GEO_CROP_X = [60, 1000];
+  const CARTO_SIDE_PAD_PX = 10; // screen px of space left/right of the mobile cartogram
   function cartoZoom(t) {
     if (!isMobile()) {
       gMap.attr("transform", null);
       svg.attr("viewBox", `0 0 ${CANVAS_W} ${HEIGHT}`);
       return 1;
     }
-    const kFull = (CANVAS_W - 2 * CARTO_PAD) / GRID_W;
-    const k = 1 + (kFull - 1) * t;
-    const tx = (CARTO_PAD - GRID_X0 * kFull) * t;
-    const ty = (CARTO_PAD - GRID_Y0 * kFull) * t;
-    gMap.attr("transform", `translate(${tx},${ty}) scale(${k})`);
-    const cartoH = GRID_H * kFull + 2 * CARTO_PAD;
-    svg.attr("viewBox", `0 0 ${CANVAS_W} ${HEIGHT + (cartoH - HEIGHT) * t}`);
+    const kGeo = (CANVAS_W - 2 * CARTO_PAD) / (GEO_CROP_X[1] - GEO_CROP_X[0]);
+    const geo = { k: kGeo, tx: CARTO_PAD - GEO_CROP_X[0] * kGeo, ty: 0, h: HEIGHT * kGeo };
+    const sidePad = CARTO_SIDE_PAD_PX * CANVAS_W / (svg.node().getBoundingClientRect().width || CANVAS_W);
+    const kGrid = (CANVAS_W - 2 * sidePad) / GRID_W;
+    const grid = { k: kGrid, tx: sidePad - GRID_X0 * kGrid, ty: CARTO_PAD - GRID_Y0 * kGrid, h: GRID_H * kGrid + 2 * CARTO_PAD };
+    const lerp = key => geo[key] + (grid[key] - geo[key]) * t;
+    const k = lerp("k");
+    gMap.attr("transform", `translate(${lerp("tx")},${lerp("ty")}) scale(${k})`);
+    svg.attr("viewBox", `0 0 ${CANVAS_W} ${lerp("h")}`);
     return k;
   }
 
