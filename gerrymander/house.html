@@ -100,7 +100,7 @@
 
     // One flat color each for gains, losses, and no change, plus "no data".
     // Legend labels for each group (only groups present in the data show).
-    legendLabels: { negative: "Democratic gain", mid: "Redrawn, no change in seats", positive: "Republican gain", independent: "Independent gain", none: "Not redrawn" },
+    legendLabels: { negative: "Redrawn, Democratic gain", mid: "Redrawn, no change in seats", positive: "Republican gain", independent: "Independent gain", none: "Not redrawn" },
     // Suffix on each number: "+3R", "+2D", "+1I".
     partyLabels: { negative: "D", positive: "R", independent: "I" },
 
@@ -115,7 +115,7 @@
 
     // TEMPORARY: show "+0" under no-change states (in the CSV with 0), to check label
     // spacing and placement. Set to false before publishing.
-    showPlaceholderLabels: true,
+    showPlaceholderLabels: false,
     colors: {
       negative: "#00415b",
       mid: "#bdbdbd",
@@ -170,9 +170,13 @@
     HI:[0,7], TX:[3,7], FL:[8,7]
   };
 
-  const CALLOUT_STATES = ["NJ", "RI", "DE", "MD", "NH"];
-  const CALLOUT_X = 1010;
-  const CALLOUT_Y_OFFSET = { MD: 61, DE: 18 };
+  const CALLOUT_STATES = ["NJ", "RI", "DE"];
+  const CALLOUT_X = 990;
+  const CALLOUT_Y_OFFSET = { DE: 10, RI: 4 };
+  // Per-state nudge left (negative) or right for a side label and its line end.
+  const CALLOUT_X_OFFSET = {};
+  // Side labels placed right beside their state (x = state center + n), with no line.
+  const CALLOUT_NEAR = { NJ: 0, DE: 0, RI: -10 };
   const CALLOUT_SHIFT = {};
   const CALLOUT_GAP = 5;
 
@@ -250,7 +254,7 @@
   // The geo map leaves room on the right for the small Northeast states'
   // side labels. The drawing area is trimmed to the map's height so there's
   // no empty band.
-  const geoW = CALLOUT_X - 10;
+  const geoW = 1000;  // map width; fixed so moving the side labels doesn't resize the map
   const projection = d3.geoAlbersUsa().fitWidth(geoW, fc);
   const geoBottom = d3.geoPath(projection).bounds(fc)[1][1];
   HEIGHT = Math.ceil(Math.max(geoBottom, GRID_H));
@@ -263,8 +267,10 @@
     LA: [-14, 0],
     CA: [-10, 0],
     FL: [15, -7],
-    NC: [8, 0],
-    MA: [0, -2]
+    NC: [10, 0],
+    MA: [0, -2],
+    NH: [4, 4],
+    VT: [0, -4]
   };
 
   // Nudges for just the state abbreviation (not the number under it), on
@@ -272,6 +278,11 @@
   const ABBR_OFFSETS = {
     TN: [0, 3]
   };
+
+  // On the geo map, MD's label sits where DC's would be (DC itself is
+  // unlabeled there; its label fades in on the cartogram).
+  const dcFeature = features.find(f => FIPS_TO_ABBR[String(f.id).padStart(2, "0")] === "DC");
+  const LABEL_AT = { MD: dcFeature ? geoPath.centroid(dcFeature) : null };
 
   const states = features.map(f => {
     const abbr = FIPS_TO_ABBR[String(f.id).padStart(2, "0")];
@@ -282,7 +293,7 @@
     const geoC = geoPath.centroid(f);
     const gridC = squareCentroid(col, row);
     const offset = LABEL_OFFSETS[abbr] || [0, 0];
-    const labelGeoC = [geoC[0] + offset[0], geoC[1] + offset[1]];
+    const labelGeoC = LABEL_AT[abbr] || [geoC[0] + offset[0], geoC[1] + offset[1]];
     return {
       id: f.id,
       abbr,
@@ -297,7 +308,7 @@
       small: CALLOUT_STATES.includes(abbr),
       lineStart: [geoC[0], geoC[1] + (CALLOUT_SHIFT[abbr] || 0)],
       anchor: CALLOUT_STATES.includes(abbr)
-        ? [CALLOUT_X, geoC[1] + (CALLOUT_SHIFT[abbr] || 0) + (CALLOUT_Y_OFFSET[abbr] || 0)]
+        ? [CALLOUT_NEAR[abbr] != null ? geoC[0] + CALLOUT_NEAR[abbr] : CALLOUT_X + (CALLOUT_X_OFFSET[abbr] || 0), geoC[1] + (CALLOUT_SHIFT[abbr] || 0) + (CALLOUT_Y_OFFSET[abbr] || 0)]
         : null,
       interp: flubber.interpolate(geoD, gridD, { maxSegmentLength: 6 })
     };
@@ -425,7 +436,7 @@
     .text(d => d.abbr);
 
   const calloutLines = gLines.selectAll("line.callout-line")
-    .data(smallStates, d => d.id)
+    .data(smallStates.filter(d => CALLOUT_NEAR[d.abbr] == null), d => d.id)
     .join("line")
     .attr("class", "callout-line")
     .attr("x1", d => d.lineStart[0])
@@ -516,6 +527,50 @@
       : d.delta === 0 ? "#767c7d"
       : CONFIG.colors[d.key]);
 
+  // Leader lines match their side label's color.
+  calloutLines.style("stroke", d => !d.hasData ? "#b0b0b0"
+    : d.key === "mid" ? "#767c7d"
+    : CONFIG.colors[d.key]);
+
+  // When the map is drawn small, the NH and RI labels crowd their neighbors,
+  // so they pop out to side labels with leader lines (geo view only).
+  const POPOUT_STATES = ["NH", "RI"];
+  const POPOUT_BELOW_PX = 700; // rendered map width, in screen px
+  const isPopout = () => svg.node().getBoundingClientRect().width < POPOUT_BELOW_PX;
+  const popoutStates = states.filter(d => POPOUT_STATES.includes(d.abbr));
+  const popoutAnchor = d => [CALLOUT_X, d.geoC[1]];
+  const sideLabelColor = d => !d.hasData ? "#b0b0b0" : d.key === "mid" ? "#767c7d" : CONFIG.colors[d.key];
+
+  const popoutLines = gLines.selectAll("line.popout-line")
+    .data(popoutStates, d => d.id)
+    .join("line")
+    .attr("class", "callout-line popout-line")
+    .attr("x1", d => d.geoC[0])
+    .attr("y1", d => d.geoC[1])
+    .attr("x2", d => popoutAnchor(d)[0])
+    .attr("y2", d => popoutAnchor(d)[1])
+    .style("stroke", sideLabelColor)
+    .attr("opacity", 0);
+
+  const popouts = gCallouts.selectAll("g.popout")
+    .data(popoutStates, d => d.id)
+    .join("g")
+    .attr("class", "callout popout")
+    .attr("transform", d => `translate(${popoutAnchor(d)[0] + CALLOUT_GAP},${popoutAnchor(d)[1]})`)
+    .attr("opacity", 0);
+  popouts.append("text")
+    .attr("class", "callout-value")
+    .attr("dy", 0)
+    .text(d => d.abbr);
+  popouts.filter(showsNumber)
+    .append("text")
+    .attr("class", "callout-delta")
+    .attr("dy", "1.1em")
+    .text(numberText);
+  popouts.selectAll("text")
+    .style("text-shadow", d => d.hasData && d.delta !== 0 ? "none" : "0 0 3px rgba(255,255,255,0.75)")
+    .style("fill", sideLabelColor);
+
   const toggleBtn = document.getElementById("toggle");
   const labelGeo = document.getElementById("labelGeo");
   const labelCarto = document.getElementById("labelCarto");
@@ -530,13 +585,18 @@
     smallInteriorLabels.attr("opacity", labelOpacity(t));
     // On mobile, not-redrawn states have no label on the geo map; it fades
     // in only as the map becomes the cartogram.
-    normalLabels.attr("opacity", d => (isMobile() && !d.hasData) ? labelOpacity(t) : 1);
+    // NH/RI move to popout side labels when the map is small.
+    const popped = isPopout();
+    const isPopped = d => popped && POPOUT_STATES.includes(d.abbr);
+    normalLabels.attr("opacity", d => (d.abbr === "DC" || isPopped(d) || (isMobile() && !d.hasData)) ? labelOpacity(t) : 1);
     normalAbbrs
       .attr("x", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[0] * (1 - t))
       .attr("y", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[1] * (1 - t));
     // No side labels/leader lines for small states with no change.
-    callouts.attr("opacity", d => hideCallout(d) ? 0 : calloutOpacity(t));
+    callouts.attr("opacity", d => (hideCallout(d) || isPopped(d)) ? 0 : calloutOpacity(t));
     calloutLines.attr("opacity", d => hideCallout(d) ? 0 : calloutOpacity(t));
+    popouts.attr("opacity", d => (!popped || hideCallout(d)) ? 0 : calloutOpacity(t));
+    popoutLines.attr("opacity", d => (!popped || hideCallout(d)) ? 0 : calloutOpacity(t));
     toggleBtn.setAttribute("aria-checked", t > 0.5);
     labelGeo.classList.toggle("active", t <= 0.5);
     labelCarto.classList.toggle("active", t > 0.5);
