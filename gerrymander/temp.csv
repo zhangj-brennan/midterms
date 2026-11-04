@@ -1,11 +1,11 @@
-NAME,Delta,Abbr,Flip
-Alabama,0,AL,FALSE
-California,0,CA,FALSE
-Florida,0,FL,FALSE
-Louisiana,0,LA,FALSE
-Missouri,0,MO,FALSE
-North Carolina,0,NC,FALSE
-Ohio,0,OH,FALSE
-Tennessee,0,TN,FALSE
-Texas,0,TX,FALSE
-Utah,0,UT,FALSE
+NAME,Abbr,Delta House,Delta Senate,Flip House,Flip Senate
+Alabama,AL,0,0,FALSE,FALSE
+California,CA,0,0,FALSE,FALSE
+Florida,FL,0,0,FALSE,FALSE
+Louisiana,LA,0,0,FALSE,FALSE
+Missouri,MO,0,0,FALSE,FALSE
+North Carolina,NC,0,0,FALSE,FALSE
+Ohio,OH,0,0,FALSE,FALSE
+Tennessee,TN,0,0,FALSE,FALSE
+Texas,TX,0,0,FALSE,FALSE
+Utah,UT,0,0,FALSE,FALSE
