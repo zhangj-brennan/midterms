@@ -1,0 +1,398 @@
+@font-face {
+  font-family: "Benton";
+  src: url("Benton Sans/Benton Sans Book.otf");
+}
+
+@font-face {
+  font-family: "BentonStrong";
+  src: url("Benton Sans/Benton Sans Bold.otf");
+}
+
+@font-face {
+  font-family: "BentonMedium";
+  src: url("Benton Sans/Benton Sans Medium.otf");
+}
+
+/* ------------------------------------------------------------------ */
+/* Per-metric colors live in CONFIG.metrics in index.html's <script>. */
+/* --div-none (the "no data" swatch color) is set at runtime from     */
+/* CONFIG.noDataColor there, so it stays in sync with this file.      */
+/* ------------------------------------------------------------------ */
+:root {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --text: #000000;
+  --muted: #000000;
+  --border: #ffffff;
+  --accent: #c8102e;
+  --max: 1200px;
+  --gutter: 24px;
+  --section-gap: 40px;
+  --card-gap: 24px;
+  --radius: 0;
+  --shadow: none;
+  --font-sans: "Benton", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --yellow: #ffcf01;
+  --red: #ed1c24;
+  --blue: #007194;
+  --orange: #f67613;
+  --green: #12a657;
+  --div-neg: var(--yellow);
+  --div-mid: #dbdada;
+  --div-pos: var(--green);
+  --div-none: #cfcdc7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 800;
+}
+
+#container {
+  max-width: 800px;
+  margin: 10px auto;
+  padding: 0 10px;
+}
+
+.figure-label {
+  margin-bottom: 6px;
+  font-family: "BentonStrong";
+  font-size: 12px;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgb(237, 28, 36);
+}
+
+#title {
+  max-width: 800px;
+  border-top: 2px solid black;
+  padding-top: 14px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  line-height: 1.6;
+  font-family: "BentonStrong";
+}
+
+#subtitle {
+  font-family: "Benton";
+  font-size: 14px;
+  line-height: 19px;
+}
+
+h3 {
+  margin: 0 0 0px;
+  font-size: 12px;
+  line-height: 1;
+  font-family: "BentonStrong";
+}
+
+.footnote {
+  font-size: 10px;
+  width: 500px;
+  max-width: 100%;
+  margin-bottom: 0;
+}
+.footnote strong {
+  font-family: "BentonStrong";
+}
+
+.toggle-btn {
+  font-family: "BentonStrong";
+  font-size: 12px;
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid black;
+  border-radius: var(--radius);
+  background-color: white;
+  color: black;
+  cursor: pointer;
+}
+.toggle-btn.active {
+  background-color: black;
+  color: white;
+}
+
+.panel {
+  max-width: 800px;
+  margin-top: 20px;
+  overflow: hidden;
+}
+
+.metric-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 14px;
+}
+
+.region-buttons-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 20px 12px;
+}
+.region-buttons-label {
+  font-family: "BentonStrong";
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.region-select {
+  font-family: "BentonStrong";
+  font-size: 11px;
+  margin: 0;
+  padding: 3px 8px;
+  border: 1px solid black;
+  border-radius: var(--radius);
+  background-color: white;
+  color: black;
+  cursor: pointer;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px 20px 18px;
+  flex-wrap: wrap;
+}
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.toggle-label {
+  font-family: "BentonStrong";
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.4;
+  transition: opacity 160ms ease;
+}
+.toggle-label.active { opacity: 1; }
+
+.switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid black;
+  border-radius: 0;
+  background: white;
+  cursor: pointer;
+  flex: none;
+}
+.switch-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  background: black;
+  transition: transform 160ms ease, background 160ms ease;
+}
+.switch[aria-checked="true"] .switch-knob {
+  transform: translateX(14px);
+  background: black;
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 20px;
+  margin-bottom: 30px;
+  box-sizing: border-box;
+}
+.legend h3 {
+  flex: none;
+}
+.legend-row { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.legend-buckets { display: flex; gap: 4px; }
+.legend-bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-family: "BentonMedium";
+  font-size: 10px;
+}
+.legend-bucket .swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid black;
+  flex: none;
+}
+.legend-buckets--categorical {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: 14px;
+}
+.legend-buckets--grid {
+  display: grid;
+  justify-content: start;
+}
+.legend-buckets--categorical .legend-bucket {
+  flex-direction: row;
+  gap: 6px;
+}
+.legend-buckets--ranges {
+  flex-direction: column;
+  gap: 3px;
+  width: 300px;
+  font-family: "BentonMedium";
+  font-size: 10px;
+}
+.range-bar { display: flex; }
+.range-bar .swatch {
+  flex: 1;
+  height: 14px;
+  border: 1px solid white;
+  border-left-width: 0;
+}
+.range-bar .swatch:first-child { border-left-width: 1px; }
+.range-ticks { position: relative; height: 12px; }
+.range-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.legend-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-family: "BentonMedium";
+  font-size: 11px;
+}
+.legend-note .swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid black;
+  background: var(--div-none);
+}
+
+.map-wrap {
+  position: relative;
+  padding: 0 8px 8px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.metric-note {
+  text-align: left;
+  font-family: "BentonMedium";
+  font-size: 11px;
+}
+
+svg { display: block; width: 100%; height: auto; }
+
+path.state {
+  stroke: white;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+path.state.is-hover {
+  stroke: black;
+  stroke-width: 3;
+}
+
+path.state.region-faded,
+g.state-label.region-faded {
+  opacity: 0.35;
+}
+
+g.state-label {
+  transition: opacity 150ms ease;
+}
+g.state-label text {
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  fill: black;
+}
+g.state-label text.value {
+  font-family: "BentonMedium";
+  font-size: 14px;
+}
+g.state-label text.carto-delta,
+g.callout text.callout-delta {
+  font-family: "Benton";
+  font-weight: normal;
+  font-size: 13px;
+}
+
+.callout-line {
+  fill: none;
+  stroke: black;
+  stroke-width: 0.75;
+}
+
+g.callout text {
+  text-anchor: start;
+  dominant-baseline: central;
+  pointer-events: none;
+  fill: black;
+}
+g.callout text.callout-value {
+  font-family: "BentonMedium";
+  font-size: 14px;
+}
+
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: #fff;
+  color: #000;
+  border: 1px solid black;
+  padding: 10px 12px;
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  min-width: 200px;
+  max-width: 320px;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 12px));
+  transition: opacity 120ms ease;
+  white-space: normal;
+  z-index: 5;
+}
+.tooltip.tooltip--below {
+  transform: translate(-50%, 12px);
+}
+.tooltip strong { font-family: "BentonStrong"; }
+.tooltip .sub { font-family: "Benton"; }
+
+.status {
+  padding: 40px 20px;
+  text-align: center;
+  font-family: "Benton";
+  font-size: 13px;
+}
+
+@media (max-width: 500px) {
+  .map-wrap { overflow-x: auto; }
+  .controls { flex-direction: column; align-items: stretch; }
+  .view-toggle { justify-content: center; }
+}
