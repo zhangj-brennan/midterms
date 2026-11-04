@@ -665,6 +665,10 @@
   }
 
   toggleBtn.addEventListener("click", () => animateTo(currentT <= 0.5 ? 1 : 0));
+  // The "Geographic" / "Cartogram" words also switch the view.
+  labelGeo.addEventListener("click", () => animateTo(0));
+  labelCarto.addEventListener("click", () => animateTo(1));
+  [labelGeo, labelCarto].forEach(el => { el.style.cursor = "pointer"; });
 
   // ---- Legend -----------------------------------------------------------
   // One swatch per group (gain / no change / loss) that appears in the data.
