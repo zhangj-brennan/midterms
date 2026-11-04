@@ -47,6 +47,14 @@
   box-sizing: border-box;
 }
 
+/* Keep phone browsers (iOS Safari especially) from applying their own
+   rounded, gradient button styling. */
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
 html,
 body {
   margin: 0;
@@ -168,19 +176,19 @@ h3 {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  padding: 6px 20px 18px;
+  padding: 20px 20px 18px;
   flex-wrap: wrap;
 }
 
 .view-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: none;
 }
 .toggle-label {
   font-family: "BentonStrong";
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   opacity: 0.4;
@@ -190,8 +198,8 @@ h3 {
 
 .switch {
   position: relative;
-  width: 32px;
-  height: 18px;
+  width: 24px;
+  height: 14px;
   padding: 0;
   border: 1px solid black;
   border-radius: 0;
@@ -203,13 +211,13 @@ h3 {
   position: absolute;
   top: 1px;
   left: 1px;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   background: black;
   transition: transform 160ms ease, background 160ms ease;
 }
 .switch[aria-checked="true"] .switch-knob {
-  transform: translateX(14px);
+  transform: translateX(10px);
   background: black;
 }
 
@@ -395,55 +403,7 @@ g.callout text.callout-value {
   #container { padding: 0 4px; }
   .legend { padding: 0; margin-bottom: 14px; }
   .map-wrap { overflow-x: auto; padding: 0; }
-  .controls { padding: 6px 0 12px; }
+  .controls { padding: 16px 0 12px; }
   .controls { flex-direction: column; align-items: stretch; }
   .view-toggle { justify-content: center; }
-}
-
-/* ------------------------------------------------------------------ */
-/* index.html wrapper: wide House / Senate toggle above the map frame */
-/* ------------------------------------------------------------------ */
-/* The toggle's side margins match the map page's own side padding, so the
-   button lines up with the map's title and legend inside the frame. */
-.chamber-page {
-  max-width: 800px;
-  margin: 0 auto;
-  padding-top: 10px;
-}
-.chamber-title {
-  margin: 0 10px 10px;
-}
-.chamber-toggle {
-  display: flex;
-  margin: 0 10px;
-  border: 1px solid black;
-}
-.chamber-btn {
-  flex: 1;
-  font-family: "BentonStrong";
-  font-size: 13px;
-  padding: 5px 12px;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  background: white;
-  color: black;
-  cursor: pointer;
-}
-.chamber-btn + .chamber-btn {
-  border-left: 1px solid black;
-}
-.chamber-btn.active {
-  background: black;
-  color: white;
-}
-.chamber-frame {
-  display: block;
-  width: 100%;
-  height: 700px;
-  border: 0;
-}
-@media (max-width: 500px) {
-  .chamber-toggle { margin: 0 4px; }
-  .chamber-title { margin: 0 4px 10px; }
 }

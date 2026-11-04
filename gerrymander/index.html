@@ -10,7 +10,66 @@
   which sizes the frame to fit, and this page in turn reports its own height
   to the embedding page (e.g. Drupal), so there's no extra white space.
 -->
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=4">
+<!-- Toggle styles live here (not in style.css) so this page can't be paired
+     with a stale cached stylesheet, and so phone browsers' default button
+     and iframe styling never show through. -->
+<style>
+  /* ------------------------------------------------------------------ */
+  /* index.html wrapper: wide House / Senate toggle above the map frame */
+  /* ------------------------------------------------------------------ */
+  /* The toggle's side margins match the map page's own side padding, so the
+     button lines up with the map's title and legend inside the frame. */
+  .chamber-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding-top: 10px;
+  }
+  .chamber-title {
+    margin: 0 10px 10px;
+  }
+  .chamber-toggle {
+    display: flex;
+    margin: 0 10px;
+    border: 1px solid black;
+  }
+  .chamber-btn {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    font-family: "BentonStrong";
+    font-size: 13px;
+    padding: 5px 12px;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: white;
+    color: black;
+    cursor: pointer;
+  }
+  .chamber-btn + .chamber-btn {
+    border-left: 1px solid black;
+  }
+  .chamber-btn.active {
+    background: black;
+    color: white;
+  }
+  .chamber-frame {
+    display: block;
+    /* width:1px + min-width:100% stops iOS Safari from sizing the frame
+       to its content instead of to the page. */
+    width: 1px;
+    min-width: 100%;
+    height: 700px;
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  @media (max-width: 500px) {
+    .chamber-toggle { margin: 0 4px; }
+    .chamber-title { margin: 0 4px 10px; }
+  }
+</style>
 </head>
 <body>
 <div class="chamber-page" id="chamberPage">
@@ -18,10 +77,10 @@
     <h1>Changes in recently redrawn states</h1>
   </div>
   <div class="chamber-toggle" role="group" aria-label="Choose chamber">
-    <button type="button" class="chamber-btn active" data-src="house.html?inframe" aria-pressed="true">House</button>
-    <button type="button" class="chamber-btn" data-src="senate.html?inframe" aria-pressed="false">Senate</button>
+    <button type="button" class="chamber-btn active" data-src="house.html?inframe&v=4" aria-pressed="true">House</button>
+    <button type="button" class="chamber-btn" data-src="senate.html?inframe&v=4" aria-pressed="false">Senate</button>
   </div>
-  <iframe class="chamber-frame" id="chamberFrame" src="house.html?inframe" scrolling="no" title="Change in House seats map"></iframe>
+  <iframe class="chamber-frame" id="chamberFrame" src="house.html?inframe&v=4" scrolling="no" frameborder="0" title="Change in House seats map"></iframe>
 </div>
 
 <script>
