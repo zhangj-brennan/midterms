@@ -340,11 +340,14 @@
   }
   states.forEach(d => { if (d.flip && d.hasData) d.fill = stripeFill(d.key); });
 
-  const gStates = svg.append("g");
-  const gLines = svg.append("g");
-  const gLabels = svg.append("g");
-  const gSmallLabels = svg.append("g");
-  const gCallouts = svg.append("g");
+  // Everything drawn on the map sits in one group, so the cartogram can be
+  // zoomed to fill the width on mobile (see cartoZoom below).
+  const gMap = svg.append("g");
+  const gStates = gMap.append("g");
+  const gLines = gMap.append("g");
+  const gLabels = gMap.append("g");
+  const gSmallLabels = gMap.append("g");
+  const gCallouts = gMap.append("g");
 
   function tooltipHtml(d) {
     if (!d.hasData) return `<strong>${d.name}</strong><br><span class="sub">${CONFIG.noDataLabel}</span>`;
@@ -575,13 +578,40 @@
   const labelGeo = document.getElementById("labelGeo");
   const labelCarto = document.getElementById("labelCarto");
 
+  // On mobile the 11-column grid only spans ~73% of the width, so the
+  // cartogram is zoomed until the grid fills the width, and the drawing
+  // grows taller to fit it. Eases in with the geo→cartogram morph.
+  const CARTO_PAD = 4;
+  function cartoZoom(t) {
+    if (!isMobile()) {
+      gMap.attr("transform", null);
+      svg.attr("viewBox", `0 0 ${CANVAS_W} ${HEIGHT}`);
+      return 1;
+    }
+    const kFull = (CANVAS_W - 2 * CARTO_PAD) / GRID_W;
+    const k = 1 + (kFull - 1) * t;
+    const tx = (CARTO_PAD - GRID_X0 * kFull) * t;
+    const ty = (CARTO_PAD - GRID_Y0 * kFull) * t;
+    gMap.attr("transform", `translate(${tx},${ty}) scale(${k})`);
+    const cartoH = GRID_H * kFull + 2 * CARTO_PAD;
+    svg.attr("viewBox", `0 0 ${CANVAS_W} ${HEIGHT + (cartoH - HEIGHT) * t}`);
+    return k;
+  }
+
+  const CARTO_SPREAD_PX = 2;
+  const cartoDeltas = svg.selectAll("g.state-label text.carto-delta");
+
   function update(t) {
+    // Labels are scaled back down by the zoom, so only the boxes grow.
+    const zoom = cartoZoom(t);
+    const unzoom = zoom === 1 ? "" : ` scale(${1 / zoom})`;
     paths.attr("d", d => t === 0 ? d.fullGeoD : d.interp(t));
     normalLabels.attr("transform", d => {
       const x = d.labelGeoC[0] + (d.gridC[0] - d.labelGeoC[0]) * t;
       const y = d.labelGeoC[1] + (d.gridC[1] - d.labelGeoC[1]) * t;
-      return `translate(${x},${y})`;
+      return `translate(${x},${y})${unzoom}`;
     });
+    smallInteriorLabels.attr("transform", d => `translate(${d.gridC[0]},${d.gridC[1]})${unzoom}`);
     smallInteriorLabels.attr("opacity", labelOpacity(t));
     // On mobile, not-redrawn states have no label on the geo map; it fades
     // in only as the map becomes the cartogram.
@@ -592,6 +622,12 @@
     normalAbbrs
       .attr("x", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[0] * (1 - t))
       .attr("y", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[1] * (1 - t));
+    // Cartogram only: push the abbreviation up and the number down, adding
+    // CARTO_SPREAD_PX (screen px) between them. Eases in with the morph.
+    const pxUnit = CANVAS_W / (svg.node().getBoundingClientRect().width || CANVAS_W);
+    const spread = (CARTO_SPREAD_PX / 2) * pxUnit * t;
+    pairedAbbrs.attr("y", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[1] * (1 - t) - spread);
+    cartoDeltas.attr("y", spread);
     // No side labels/leader lines for small states with no change.
     callouts.attr("opacity", d => (hideCallout(d) || isPopped(d)) ? 0 : calloutOpacity(t));
     calloutLines.attr("opacity", d => hideCallout(d) ? 0 : calloutOpacity(t));
