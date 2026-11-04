@@ -392,7 +392,10 @@ g.callout text.callout-value {
 }
 
 @media (max-width: 500px) {
-  .map-wrap { overflow-x: auto; }
+  #container { padding: 0 4px; }
+  .legend { padding: 0; margin-bottom: 14px; }
+  .map-wrap { overflow-x: auto; padding: 0; }
+  .controls { padding: 6px 0 12px; }
   .controls { flex-direction: column; align-items: stretch; }
   .view-toggle { justify-content: center; }
 }

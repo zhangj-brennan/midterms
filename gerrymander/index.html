@@ -238,11 +238,10 @@
     const abbr = FIPS_TO_ABBR[String(f.id).padStart(2, "0")];
     return abbr && GRID[abbr];
   });
-  // The geo map fills the full width unless a small Northeast state has a
-  // change and needs room on the right for its side label. The drawing
-  // area is then trimmed to the map's height so there's no empty band.
-  const needCallouts = CALLOUT_STATES.some(a => DATA[a] && DATA[a].delta != null && (DATA[a].delta !== 0 || CONFIG.showPlaceholderLabels));
-  const geoW = needCallouts ? CALLOUT_X - 10 : CANVAS_W;
+  // The geo map leaves room on the right for the small Northeast states'
+  // side labels. The drawing area is trimmed to the map's height so there's
+  // no empty band.
+  const geoW = CALLOUT_X - 10;
   const projection = d3.geoAlbersUsa().fitWidth(geoW, fc);
   const geoBottom = d3.geoPath(projection).bounds(fc)[1][1];
   HEIGHT = Math.ceil(Math.max(geoBottom, GRID_H));
@@ -462,7 +461,7 @@
       .attr("dy", CARTO_DELTA_DY)
       .text(numberText);
   });
-  svg.selectAll("g.state-label text.value")
+  const pairedAbbrs = svg.selectAll("g.state-label text.value")
     .filter(showsNumber)
     .attr("dy", "-0.6em");
 
@@ -472,9 +471,12 @@
     .attr("dy", "1.1em")
     .text(numberText);
 
-  // States whose side label/leader line is hidden on the geo map.
-  const isNoChange = d => !showsNumber(d);
+  // Side labels/leader lines are always shown, except for not-redrawn
+  // states on mobile (matching the in-map labels there).
+  const hideCallout = d => isMobile() && !d.hasData;
   const normalAbbrs = normalLabels.select("text.value");
+  const MOBILE_MAX_WIDTH = 500;
+  const isMobile = () => window.innerWidth < MOBILE_MAX_WIDTH;
   const labelOpacity = d3.scaleLinear().domain([0.35, 0.75]).range([0, 1]).clamp(true);
   const calloutOpacity = d3.scaleLinear().domain([0.15, 0.4]).range([1, 0]).clamp(true);
 
@@ -495,6 +497,15 @@
     .filter(d => !d.hasData)
     .style("fill", "#b0b0b0");
 
+  // Side labels (small Northeast states, geo view) match the in-map labels:
+  // same gray + shadow for no change / not redrawn. Changed states can't use
+  // white on the white background, so they take their party color instead.
+  callouts.selectAll("text")
+    .style("text-shadow", d => d.hasData && d.delta !== 0 ? "none" : "0 0 3px rgba(255,255,255,0.75)")
+    .style("fill", d => !d.hasData ? "#b0b0b0"
+      : d.delta === 0 ? "#767c7d"
+      : CONFIG.colors[signKey(d.delta)]);
+
   const toggleBtn = document.getElementById("toggle");
   const labelGeo = document.getElementById("labelGeo");
   const labelCarto = document.getElementById("labelCarto");
@@ -507,12 +518,15 @@
       return `translate(${x},${y})`;
     });
     smallInteriorLabels.attr("opacity", labelOpacity(t));
+    // On mobile, not-redrawn states have no label on the geo map; it fades
+    // in only as the map becomes the cartogram.
+    normalLabels.attr("opacity", d => (isMobile() && !d.hasData) ? labelOpacity(t) : 1);
     normalAbbrs
       .attr("x", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[0] * (1 - t))
       .attr("y", d => (ABBR_OFFSETS[d.abbr] || [0, 0])[1] * (1 - t));
     // No side labels/leader lines for small states with no change.
-    callouts.attr("opacity", d => isNoChange(d) ? 0 : calloutOpacity(t));
-    calloutLines.attr("opacity", d => isNoChange(d) ? 0 : calloutOpacity(t));
+    callouts.attr("opacity", d => hideCallout(d) ? 0 : calloutOpacity(t));
+    calloutLines.attr("opacity", d => hideCallout(d) ? 0 : calloutOpacity(t));
     toggleBtn.setAttribute("aria-checked", t > 0.5);
     labelGeo.classList.toggle("active", t <= 0.5);
     labelCarto.classList.toggle("active", t > 0.5);
@@ -584,6 +598,7 @@
   });
 
 
+  const LABEL_PAIR_OFFSET = { desktop: 0.6, mobile: 0.45 };
   const MIN_LABEL_PX = 12;
   const BASE_VALUE_SIZE = 14;
   const valueTexts = svg.selectAll("text.value, text.callout-value, text.carto-delta, text.callout-delta");
@@ -595,17 +610,22 @@
     const minViewBoxSize = MIN_LABEL_PX / scale;
     const valueSize = Math.max(BASE_VALUE_SIZE, minViewBoxSize);
     valueTexts.style("font-size", valueSize + "px");
+
+    // Abbreviation above, number below the center. On small screens the
+    // labels are scaled up, so pull the pair tighter to the center.
+    const offset = isMobile() ? LABEL_PAIR_OFFSET.mobile : LABEL_PAIR_OFFSET.desktop;
+    pairedAbbrs.attr("dy", `${-offset}em`);
+    svg.selectAll("g.state-label text.carto-delta").attr("dy", `${offset}em`);
   }
 
   applyMinLabelSize();
-  window.addEventListener("resize", applyMinLabelSize);
+  window.addEventListener("resize", () => {
+    applyMinLabelSize();
+    update(currentT);
+  });
 
-  if (window.innerWidth < 500) {
-    currentT = 1;
-    update(1);
-  } else {
-    update(0);
-  }
+  // Always open on the geographic view, on mobile too.
+  update(0);
 })();
 </script>
 </body>
